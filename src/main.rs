@@ -51,130 +51,102 @@ impl Default for Game {
     }
 }
 
-fn main() {
-    // Example starting postion.
-    // rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
-    let game = import_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-
-    // Print the board.
-    // TODO: Consider making this a part of the game struct?
-    print_board(&game);
-}
-
-fn print_board(game: &Game) {
-    // Here we can print the board or something relevant to it
-    for row in game.board.iter() {
-        for piece in row.iter() {
-            if piece.piece_type == PieceType::None {
-                print!(" E "); // E for empty piece
-            } else {
-                print!(" {} ", piece.short_name); // Print the short name of the piece
+// Adds game specific methods to the game struct.
+impl Game {
+    fn print_board(&self) {
+        // Here we can print the board or something relevant to it
+        for row in self.board.iter() {
+            for piece in row.iter() {
+                if piece.piece_type == PieceType::None {
+                    print!(" E "); // E for empty piece
+                } else {
+                    print!(" {} ", piece.short_name); // Print the short name of the piece
+                }
             }
+            println!(); // Print new line after each row
         }
-        println!(); // Print new line after each row
     }
-}
 
-fn import_fen(fen: &str) -> Game {
-    // Trim the string.
-    let trimmed_full_fen = fen.trim();
+    fn import_fen(&mut self, fen: &str) {
+        // Trim the string.
+        let trimmed_full_fen = fen.trim();
 
-    // Split by first space to separate board position from the rest of the FEN components.
-    let mut parts = trimmed_full_fen.split(' ');
-    let board_str = parts.next().expect("No board position found in FEN.");
+        // Split by first space to separate board position from the rest of the FEN components.
+        let mut parts = trimmed_full_fen.split(' ');
+        let board_str = parts.next().expect("No board position found in FEN.");
 
-    // Prepare to populate our board.
-    let rows = board_str.split('/');
-    let valid_piece_letters = ['r', 'n', 'b', 'q', 'k', 'p'];
-    let mut game: Game = Game::default();
-    let mut y_pos = 0;
+        // Prepare to populate our board.
+        let rows = board_str.split('/');
+        let mut y_pos = 0;
 
-    // Parse each row of the board.
-    for row in rows {
+        // Parse each row of the board.
+        for row in rows {
 
-        // For each char in the row, we will either have a character or a number.
-        let mut x_pos = 0;
-        for c in row.chars() {
+            // For each char in the row, we will either have a character or a number.
+            let mut x_pos = 0;
+            for c in row.chars() {
 
-            // Handles empty spaces on the board.
-            if c.is_digit(10) {
-                let num_empties = c.to_digit(10).expect("Failed to parse digit.") as usize;
+                // Handles empty spaces on the board.
+                if c.is_digit(10) {
+                    let num_empties = c.to_digit(10).expect("Failed to parse digit.") as usize;
 
-                if num_empties < 1 || num_empties > 8 {
-                    panic!("Invalid number of empty spaces: {}", num_empties);
+                    if num_empties < 1 || num_empties > 8 {
+                        panic!("Invalid number of empty spaces: {}", num_empties);
+                    }
+
+                    // Mark each square as empty.
+                    for _ in 0..num_empties {
+                        self.board[y_pos][x_pos].piece_type = PieceType::None;
+                        x_pos += 1;
+                    }
+
+                    continue;
                 }
 
-                // Board is initially empty, so just skip the number of times indicated.
-                x_pos += num_empties;
-                continue;
+                // Place the piece on the board.
+                let piece = &mut self.board[y_pos][x_pos];
+                piece.white = c.is_ascii_uppercase();
+                piece.short_name = c.to_string();
+                piece.piece_type = match c.to_ascii_lowercase() {
+                    'k' => PieceType::King,
+                    'q' => PieceType::Queen,
+                    'r' => PieceType::Rook,
+                    'b' => PieceType::Bishop,
+                    'n' => PieceType::Knight,
+                    'p' => PieceType::Pawn,
+                    _ => panic!("Unexpaced piece letter {}", c),
+                };
+
+                x_pos += 1;
             }
 
-            let piece_letter = c.to_ascii_lowercase();
-            if !valid_piece_letters.contains(&piece_letter) {
-                panic!("Unexpected piece symbol found: {}", c);
+            // Ensure that the board has exactly 8 cols.
+            if x_pos != 8 {
+                panic!("Board must have exactly 8 columns. We parsed: {}", x_pos);
             }
-            
 
-            // Place the piece on the board.
-            let piece = &mut game.board[y_pos][x_pos];
-            piece.piece_type = piece_char_to_type(&piece_letter);
-            piece.white = c.is_ascii_uppercase();
-            piece.short_name = c.to_string();
-
-            x_pos += 1;
+            y_pos += 1;
         }
 
-        // Ensure that the board has exactly 8 cols.
-        if x_pos != 8 {
-            panic!("Board must have exactly 8 columns. We parsed: {}", x_pos);
+        // Ensure that the board has exactly 8 rows.
+        if y_pos != 8 {
+            panic!("Board must have exactly 8 rows. We parsed: {}", y_pos);
         }
 
-        y_pos += 1;
+        // Store whose turn it is to move.
+        let whose_turn = parts.next().expect("Not sure whose turn it is.");
+        if whose_turn.to_ascii_lowercase() == "w" {
+            self.white_to_move = true;
+        } else if whose_turn.to_ascii_lowercase() == "b" {
+            self.white_to_move = false;
+        } else {
+            panic!("Unexpected character for whose turn it is: {}. Should be 'w' or 'b'.", whose_turn);
+        }
     }
-
-    // Ensure that the board has exactly 8 rows.
-    if y_pos != 8 {
-        panic!("Board must have exactly 8 rows. We parsed: {}", y_pos);
-    }
-
-    // Store whose turn it is to move.
-    let whose_turn = parts.next().expect("Not sure whose turn it is.");
-    if whose_turn.to_ascii_lowercase() == "w" {
-        game.white_to_move = true;
-    } else if whose_turn.to_ascii_lowercase() == "b" {
-        game.white_to_move = false;
-    } else {
-        panic!("Unexpected character for whose turn it is: {}. Should be 'w' or 'b'.", whose_turn);
-    }
-
-    return game;
 }
 
-/*
-    This code assumes the piece name is valid. Consider consolidating this block somehow with the import.
-*/
-fn piece_char_to_type(c: &char) -> PieceType {
-
-    // TODO: Can this be cleaned up with a `match` statement?
-    if *c == 'k' {
-        return PieceType::King;
-    }
-    else if *c == 'q' {
-        return PieceType::Queen;
-    }
-    else if *c == 'r' {
-        return PieceType::Rook;
-    }
-    else if *c == 'b' {
-        return PieceType::Bishop;
-    }
-    else if *c == 'n' {
-        return PieceType::Knight;
-    }
-    else if *c == 'p' {
-        return PieceType::Pawn;
-    }
-    else {
-        panic!("Unknown piece name given, {}", c);
-    }
+fn main() {
+    let mut game = Game::default();
+    game.import_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    game.print_board();
 }
