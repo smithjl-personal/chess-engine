@@ -25,19 +25,24 @@ impl Default for Game {
 
 // Adds game specific methods to the game struct.
 impl Game {
-    // See: https://stackoverflow.com/questions/75778092/text-based-chess-board-in-python
     pub fn print_board(&self) {
-        // Here we can print the board or something relevant to it
-        for row in self.board.iter() {
+        println!("    A   B   C   D   E   F   G   H");
+        println!("  |---|---|---|---|---|---|---|---|");
+        for (y, row) in self.board.iter().enumerate() {
+            print!("{} |", BOARD_SIZE - y);
             for piece in row.iter() {
-                if piece.piece_type == PieceType::None {
-                    print!(" E "); // E for empty piece
-                } else {
-                    print!(" {} ", piece.short_name); // Print the short name of the piece
-                }
+                let display: &str = match piece.piece_type {
+                    PieceType::None => " ",
+                    _=> &piece.short_name,
+                };
+
+                print!(" {} |", display);
             }
-            println!(); // Print new line after each row
+            print!(" {}", BOARD_SIZE - y);
+            println!();
+            println!("  |---|---|---|---|---|---|---|---|");
         }
+        println!("    A   B   C   D   E   F   G   H");
     }
 
     pub fn import_fen(&mut self, fen: &str) {
