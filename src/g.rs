@@ -45,6 +45,15 @@ impl Game {
         println!("    A   B   C   D   E   F   G   H");
     }
 
+    pub fn debug_print_piece_coords(&self){
+        for row in self.board.iter() {
+            for piece in row.iter() {
+                print!(" {} ", piece.coord)
+            }
+            println!();
+        }
+    }
+
     pub fn import_fen(&mut self, fen: &str) {
         // Trim the string.
         let trimmed_full_fen = fen.trim();
@@ -75,6 +84,10 @@ impl Game {
                     // Mark each square as empty.
                     for _ in 0..num_empties {
                         self.board[y_pos][x_pos].piece_type = PieceType::None;
+
+                        // TODO: Move this into default function. The position of a piece should not depend on the FEN.
+                        self.board[y_pos][x_pos].coord.x = x_pos;
+                        self.board[y_pos][x_pos].coord.y = y_pos;
                         x_pos += 1;
                     }
 
@@ -95,6 +108,7 @@ impl Game {
                     _ => panic!("Unexpaced piece letter {}", c),
                 };
 
+                // TODO: Move this into default function. The position of a piece should not depend on the FEN.
                 piece.coord.x = x_pos;
                 piece.coord.y = y_pos;
 

@@ -1,6 +1,6 @@
 use crate::constants::BOARD_SIZE;  // Importing the constant
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Coord {
     pub x: usize,
     pub y: usize,
