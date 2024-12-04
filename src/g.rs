@@ -1,5 +1,4 @@
-//mod piece;
-const BOARD_SIZE: usize = 8;
+use crate::constants::BOARD_SIZE;  // Importing the constant
 use std::array;
 use crate::{piece::Piece, my_move::Move, piece_type::PieceType};
 
@@ -91,8 +90,8 @@ impl Game {
                     _ => panic!("Unexpaced piece letter {}", c),
                 };
 
-                piece.x = x_pos;
-                piece.y = y_pos;
+                piece.coord.x = x_pos;
+                piece.coord.y = y_pos;
 
                 x_pos += 1;
             }

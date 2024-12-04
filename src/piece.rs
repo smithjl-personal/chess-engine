@@ -1,6 +1,5 @@
-const BOARD_SIZE: usize = 8;
-
-use crate::{piece_type::PieceType, coord::Coord, game::Game, my_move::Move};
+use crate::constants::BOARD_SIZE;  // Importing the constant
+use crate::{piece_type::PieceType, coord::Coord, g::Game, my_move::Move};
 
 
 // Struct for each piece on the board
@@ -10,8 +9,7 @@ pub struct Piece {
     pub short_name: String,
 
     // To see our legal moves, we track the position of each actual piece.
-    pub x: usize,
-    pub y: usize,
+    pub coord: Coord,
 
     // Important for castling, and pawns.
     pub has_moved: bool,
@@ -25,8 +23,10 @@ impl Default for Piece {
             white: false,
             short_name: String::from(""),
 
-            x: 0,
-            y: 0,
+            coord: Coord {
+                x: 0,
+                y: 0,
+            },
 
             has_moved: false,
         }
@@ -49,8 +49,8 @@ impl Piece {
                  * King can move one tile in any direction. `..=` means range inclusive.
                  * This section handles normal parts, not castling.
                  */
-                for y  in (self.y.saturating_sub(1))..=(self.y + 1).min(BOARD_SIZE - 1) {
-                    for x in (self.x.saturating_sub(1))..=(self.x + 1).min(BOARD_SIZE - 1) {
+                for y  in (self.coord.y.saturating_sub(1))..=(self.coord.y + 1).min(BOARD_SIZE - 1) {
+                    for x in (self.coord.x.saturating_sub(1))..=(self.coord.x + 1).min(BOARD_SIZE - 1) {
                         let target_piece: &Piece = &game.board[y as usize][x as usize];
 
                         // We cannot move on a piece that is our own color.
@@ -63,8 +63,8 @@ impl Piece {
 
                         // Otherwise, move is legal.
                         let from_tile: Coord = Coord {
-                            x: self.x,
-                            y: self.y,
+                            x: self.coord.x,
+                            y: self.coord.y,
                         };
                         let to_tile: Coord = Coord {
                             x: x,

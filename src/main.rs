@@ -1,14 +1,15 @@
-mod piece_type;
-mod coord;
-mod piece;
-mod my_move;
-mod game;
+pub mod piece_type;
+pub mod coord;
+pub mod piece;
+pub mod my_move;
+pub mod g; // Something is wrong with rust-analyzer. This is the only way it will pick up the changes right now.
+pub mod constants;
 
-use crate::game::Game;
+use crate::g::Game;
 //use crate::piece::Piece;
 
 fn main() {
-    let mut game: Game = Game::default();
+    let mut game: Game = g::Game::default();
     //game.import_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     game.import_fen("rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1");
     //game.import_fen("rnbqkbnr/8/8/8/8/8/8/RNBQKBNR b KQkq - 0 1");
