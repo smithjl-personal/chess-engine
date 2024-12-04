@@ -60,7 +60,7 @@ impl Piece {
             if game.board[y_usize][x_usize].piece_type == PieceType::None {
                 let from_tile = self.coord;
                 let to_tile = Coord { x: x_usize, y: y_usize };
-                moves.push(Move { from: from_tile, to: to_tile });
+                moves.push(Move { from: from_tile, to: to_tile, is_capture: false, });
             }
 
             // If the tile contains a friendly piece, stop in that direction.
@@ -72,7 +72,7 @@ impl Piece {
             else {
                 let from_tile = self.coord;
                 let to_tile = Coord { x: x_usize, y: y_usize };
-                moves.push(Move { from: from_tile, to: to_tile });
+                moves.push(Move { from: from_tile, to: to_tile, is_capture: true, });
                 break;
             }
         }
@@ -97,31 +97,33 @@ impl Piece {
                     for x in (self.coord.x.saturating_sub(1))..=(self.coord.x + 1).min(BOARD_SIZE - 1) {
                         let target_piece: &Piece = &game.board[y as usize][x as usize];
 
+                        // If square is open, we can do the move.
+                        if target_piece.piece_type == PieceType::None {
+                            moves.push(Move {
+                                from: self.coord,
+                                to: target_piece.coord,
+                                is_capture: false,
+                            });
+                        }
+
                         // We cannot move on a piece that is our own color.
-                        if target_piece.piece_type != PieceType::None && target_piece.white == self.white {
+                        else if target_piece.white == self.white {
                             continue;
                         }
 
-                        // We cannot make a move that would put us in check.
-                        // TODO: Implement this?
-
-                        // Otherwise, move is legal.
-                        let from_tile: Coord = Coord {
-                            x: self.coord.x,
-                            y: self.coord.y,
-                        };
-                        let to_tile: Coord = Coord {
-                            x: x,
-                            y: y,
-                        };
-                        moves.push(Move {
-                            from: from_tile,
-                            to: to_tile,
-                        });
+                        // Last case, move must be a capture.
+                        else {
+                            moves.push(Move {
+                                from: self.coord,
+                                to: target_piece.coord,
+                                is_capture: true,
+                            });
+                        }
                     }
                 }
 
                 // TODO: Check for castling.
+                if !self.has_moved {}
             }
             PieceType::Queen => {
                 // Right
@@ -196,6 +198,7 @@ impl Piece {
                         moves.push(Move {
                             from: self.coord,
                             to: target_square.coord,
+                            is_capture: false,
                         });
                     }
 
@@ -204,15 +207,49 @@ impl Piece {
                         moves.push(Move {
                             from: self.coord,
                             to: target_square.coord,
+                            is_capture: true,
                         });
                     }
                 }
             }
-            PieceType::Pawn => {}
+            PieceType::Pawn => {
+                // White pawns go up the board, black ones go down.
+                let direction: i32 = if self.white {-1} else {1};
+
+                // We do not need to do any bounds checking for normal moves because of how pawn moves work.
+                // If a pawn makes it to the top/bottom rank, it promotes and is no longer a pawn.
+                let y_pos: i32 = self.coord.y as i32 + direction;
+
+                // Check moves, not captures here.
+                let target = &game.board[y_pos as usize][self.coord.x];
+                if target.piece_type == PieceType::None {
+                    moves.push(Move {
+                        from: self.coord,
+                        to: target.coord,
+                        is_capture: false,
+                    });
+
+                    // Check for double square move if we haven't moved yet.
+                    if !self.has_moved {
+                        let extra_target = &game.board[(y_pos + direction) as usize][self.coord.x];
+                        if extra_target.piece_type == PieceType::None {
+                            moves.push(Move {
+                                from: self.coord,
+                                to: extra_target.coord,
+                                is_capture: false,
+                            });
+                        }
+                    }
+                }
+
+                // TODO: Now check captures. We do need bounds checks here.
+            }
             PieceType::None => {
                 return moves;
             }
         }
+
+        // TODO: Remove any move that results in us being in check. That would be illegal...
 
         return moves;
     }

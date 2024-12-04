@@ -4,6 +4,7 @@ use crate::coord::Coord;
 pub struct Move {
     pub from: Coord,
     pub to: Coord,
+    pub is_capture: bool,
     // TODO: Consider storing if move is a capture, and if move is a check. Will help find good moves.
 }
 
