@@ -4,9 +4,9 @@ pub mod piece;
 pub mod my_move;
 pub mod g; // Something is wrong with rust-analyzer. This is the only way it will pick up the changes right now.
 pub mod constants;
+pub mod tests;
 
 use crate::g::Game;
-//use crate::piece::Piece;
 
 fn main() {
     let mut game: Game = g::Game::default();

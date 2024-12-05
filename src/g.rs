@@ -1,8 +1,8 @@
-use crate::constants::BOARD_SIZE;  // Importing the constant
 use std::array;
-use crate::{piece::Piece, my_move::Move, piece_type::PieceType};
+use crate::{piece::Piece, my_move::Move, piece_type::PieceType, coord::Coord, constants::BOARD_SIZE};
 
 // Struct for the chessboard, which is a 2D array of Pieces
+#[derive(Clone)]
 pub struct Game {
     pub board: [[Piece; BOARD_SIZE]; BOARD_SIZE],
     pub white_to_move: bool,
@@ -174,5 +174,33 @@ impl Game {
             println!();
         }
 
+    }
+
+
+    // TODO: Implement this.
+    pub fn is_in_check(&self, _check_white: bool) -> bool {
+        return false;
+    }
+
+    // Does not check if a move is legal.
+    pub fn make_move(&mut self, m: &Move) {
+        // Get the piece that is moving.
+        let piece_to_move = self.board[m.from.y][m.from.x].clone();
+
+        // Make the new square the new piece.
+        self.board[m.to.y][m.to.x] = piece_to_move;
+
+        // Correct the coordinates, and the moved status.
+        self.board[m.to.y][m.to.x].has_moved = true;
+        self.board[m.to.y][m.to.x].coord = Coord {
+            x: m.to.x,
+            y: m.to.y,
+        };
+
+        // Clear out the old square.
+        self.board[m.from.y][m.from.x].piece_type = PieceType::None;
+
+        // Make it the other player's turn.
+        self.white_to_move = !self.white_to_move;
     }
 }

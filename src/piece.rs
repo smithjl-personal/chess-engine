@@ -3,6 +3,7 @@ use crate::{piece_type::PieceType, coord::Coord, g::Game, my_move::Move};
 
 
 // Struct for each piece on the board
+#[derive(Clone)]
 pub struct Piece {
     pub piece_type: PieceType,
     pub white: bool,
@@ -223,6 +224,8 @@ impl Piece {
                 // Check moves, not captures here.
                 let target = &game.board[y_pos as usize][self.coord.x];
                 if target.piece_type == PieceType::None {
+
+                    // TODO: Handle pawn promotion.
                     moves.push(Move {
                         from: self.coord,
                         to: target.coord,
@@ -250,7 +253,84 @@ impl Piece {
         }
 
         // TODO: Remove any move that results in us being in check. That would be illegal...
+        /*
+         * Idea for next time.
+         * 1. Add function to `game` that determines if player is in check.
+         * 2. Make a new copy of the game, after that move is made.
+         * 3. See if we are in check!
+         * 
+         * We can also use this method to track if a move is a check or not.
+         */
 
-        return moves;
+        // Try out every move. See if it's illegal.
+        let mut moves_final: Vec<Move> = vec![];
+        for m in moves.iter() {
+            // TODO: Refactor this. Most of this should not need to be in the loop, with good code.
+
+            // Make a duplicate of this game object.
+            let mut game_copy = game.clone();
+
+            game_copy.make_move(m);
+            if !game_copy.is_in_check(game.white_to_move) {
+                moves_final.push(m.clone());
+            }
+        }
+
+        return moves_final;
+    }
+
+    pub fn is_attacking_coord(&self, coord: &Coord) -> bool {
+        match self.piece_type {
+            PieceType::King => {
+                let diff_x: isize = self.coord.x as isize - coord.x as isize;
+                let diff_y: isize = self.coord.y as isize - coord.y as isize;
+
+                let x_in_range: bool = -1 <= diff_x && diff_x <= 1;
+                let y_in_range: bool = -1 <= diff_y && diff_y <= 1;
+
+                return x_in_range && y_in_range;
+            }
+            PieceType::Queen => {
+                // TODO: Implement this.
+                return false;
+            }
+            PieceType::Rook => {
+                // TODO: Implement this.
+                return false;
+                
+            }
+            PieceType::Bishop => {
+                // TODO: Implement this.
+                return false;
+                
+            }
+            PieceType::Knight => {
+                let diff_x_abs: isize = (self.coord.x as isize - coord.x as isize).abs();
+                let diff_y_abs: isize = (self.coord.y as isize - coord.y as isize).abs();
+
+                // Since we take the absolute value, we only need to check positives.
+                let valid_a: bool = diff_x_abs == 1 && diff_y_abs == 2;
+                let valid_b: bool = diff_y_abs == 1 && diff_x_abs == 2;
+
+                return valid_a || valid_b;
+            }
+            PieceType::Pawn => {
+                let dir: isize = if self.white { -1 } else { 1 };
+                let target_y: isize = self.coord.y as isize + dir;
+
+                // Check the y position.
+                if target_y != coord.y as isize {
+                    return false;
+                }
+
+                // Check the left and right x positions.
+                let target_left: isize = self.coord.x as isize - 1;
+                let target_right: isize = self.coord.x as isize + 1;
+
+                return target_left == coord.x as isize || target_right == coord.x as isize;
+                
+            }
+            PieceType::None => { return false; }
+        }
     }
 }

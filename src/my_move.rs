@@ -1,6 +1,6 @@
 use crate::coord::Coord;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Move {
     pub from: Coord,
     pub to: Coord,
