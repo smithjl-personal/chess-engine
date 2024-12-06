@@ -6,22 +6,26 @@ pub fn run_all_tests(){
     // Do nothing right now!
     // let mut game: Game = g::Game::default();
     let mut game = g::Game::default();
-    game.import_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    game.import_fen("rnbqkbnr/pppppppp/8/8/8/8/1PPPPPPP/RNBQKBNR w KQkq - 0 1");
     game.print_board();
     //game.print_all_legal_moves();
 
     // Testing targeting functions.
     //let piece = &game.board[6][1]; // Pawn on b2
     //let piece = &game.board[7][1]; // Knight on b1
-    let piece = &game.board[7][4]; // King on e1
+    // let piece = &game.board[7][4]; // King on e1
+    // let piece = &game.board[7][0]; // Rook on a1
+
     //let coord = str_tile_to_coord("a3");
     //let coord = str_tile_to_coord("b3");
     //let coord = str_tile_to_coord("c3");
-    let coord = str_tile_to_coord("f1");
+    let source_coord = str_tile_to_coord("a1");
+    let target_coord = str_tile_to_coord("b1");
 
+    let source_piece = game.get_piece_at_coord(&source_coord);
 
-    let attacking = piece.is_attacking_coord(&coord);
-    println!("Tile {} is attacking {}: {}", piece.coord, coord, attacking);
+    let attacking = source_piece.is_attacking_coord(&target_coord, &game);
+    println!("Tile {} is attacking {}: {}", source_piece.coord, target_coord, attacking);
 }
 
 // Helper. Should this be in the coord file?

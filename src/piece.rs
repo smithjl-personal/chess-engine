@@ -3,7 +3,7 @@ use crate::{piece_type::PieceType, coord::Coord, g::Game, my_move::Move};
 
 
 // Struct for each piece on the board
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Piece {
     pub piece_type: PieceType,
     pub white: bool,
@@ -279,7 +279,7 @@ impl Piece {
         return moves_final;
     }
 
-    pub fn is_attacking_coord(&self, coord: &Coord) -> bool {
+    pub fn is_attacking_coord(&self, coord: &Coord, game: &Game) -> bool {
         match self.piece_type {
             PieceType::King => {
                 let diff_x: isize = self.coord.x as isize - coord.x as isize;
@@ -295,9 +295,82 @@ impl Piece {
                 return false;
             }
             PieceType::Rook => {
-                // TODO: Implement this.
-                return false;
-                
+                let mut dx = 0;
+                let mut dy = 0;
+                if self.coord.x == coord.x {
+                    dx = 0;
+                    if self.coord.y > coord.y {
+                        dy = -1;
+                    }
+                    else {
+                        dy = 1;
+                    }
+                }
+
+                else if self.coord.y == coord.y {
+                    dy = 0;
+                    if self.coord.x > coord.x {
+                        dx = -1;
+                    }
+                    else {
+                        dx = 1;
+                    }
+                }
+
+                // If we don't share the rank or file, we aren't attacking the square.
+                else { return false; }
+
+                // println!("Checking dx {} dy {}", dx, dy);
+
+                // TODO: Extract the below logic into a function that can be used by the queen, rook, and bishop.
+
+                // Now try and move in the direction until we reach the square.
+                let mut check_x_pos = self.coord.x as i32;
+                let mut check_y_pos = self.coord.y as i32;
+                loop {
+
+                    //println!("Beginning loop.");
+
+                    check_x_pos += dx;
+                    check_y_pos += dy;
+
+                    //println!("Looking at coord x {} y {}", check_x_pos, check_y_pos);
+
+                    // Perform a bounds check.
+                    if check_x_pos < 0 || check_y_pos < 0 || check_x_pos >= BOARD_SIZE as i32 || check_y_pos >= BOARD_SIZE as i32{
+                        return false;
+                    }
+
+                    // println!("We are in bounds.");
+
+                    // If we are on the square, we are done.
+                    if check_x_pos as usize == coord.x && check_y_pos as usize == coord.y {
+                        // println!("We are reached the target.");
+                        return true;
+                    }
+
+                    // We need more info to see if we can continue.
+                    let piece = &game.board[check_y_pos as usize][check_x_pos as usize];
+
+                    // println!("{:?}", piece);
+
+                    // If square is empty, we can continue.
+                    if piece.piece_type == PieceType::None {
+                        // println!("Square is empty, keep going.");
+                        continue;
+                    }
+
+                    // We cannot move over our pieces (normally).
+                    else if piece.white == self.white {
+                        //println!("Square is our piece, stop.");
+                        return false;
+                    }
+
+                    // At this point, we must be on an enemy piece that is not the target square. So we stop here.
+                    else {
+                        return false;
+                    }
+                }
             }
             PieceType::Bishop => {
                 // TODO: Implement this.
