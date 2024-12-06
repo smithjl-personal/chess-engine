@@ -176,6 +176,13 @@ impl Game {
 
     }
 
+    pub fn get_piece_at_coord(&self, coord: &Coord) -> &Piece {
+        if coord.x >= BOARD_SIZE || coord.y >= BOARD_SIZE {
+            panic!("Attempted to reference an out of bounds location. x:{} y:{}", coord.x, coord.y);
+        }
+
+        return &self.board[coord.y][coord.x];
+    }
 
     // TODO: Implement this.
     pub fn is_in_check(&self, _check_white: bool) -> bool {
