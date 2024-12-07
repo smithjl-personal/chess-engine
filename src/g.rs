@@ -139,41 +139,18 @@ impl Game {
         }
     }
 
-    pub fn print_all_legal_moves(&self) {
-        println!("Called print all legal moves!");
-
+    pub fn get_all_legal_moves(&self) -> Vec<Move> {
         // Get all pieces to look at.
-        let mut our_pieces: Vec<&Piece> = vec![];
+        let mut legal_moves: Vec<Move> = vec![];
         for row in self.board.iter() {
             for piece in row.iter() {
                 if piece.piece_type != PieceType::None && piece.white == self.white_to_move {
-                    our_pieces.push(&piece);
+                    legal_moves.append(&mut piece.get_legal_moves(self));
                 }
             }
         }
 
-        /*
-            There is likely a better way of doing this. But just getting something on the screen.
-
-            To figure out what legal moves a piece has, we need the following
-            1. Which color the piece is.
-            2. The piece type.
-            3. Are we in check?
-            4. Is the piece pinned?
-            5. Castling rules?
-            6. En-Pessant rules?
-        */
-        for piece in our_pieces.iter() {
-            print!("Looking at moves for {}: ", piece.short_name);
-            let moves: Vec<Move> = piece.get_legal_moves(self);
-            for m in moves.iter() {
-                //print!("{:#?}", m); // debug pretty
-                //print!("{:?}", m); // debug
-                print!("{} ", m); // normal
-            }
-            println!();
-        }
-
+        return legal_moves;
     }
 
     pub fn get_piece_at_coord(&self, coord: &Coord) -> &Piece {
@@ -184,9 +161,46 @@ impl Game {
         return &self.board[coord.y][coord.x];
     }
 
-    // TODO: Implement this.
-    pub fn is_in_check(&self, _check_white: bool) -> bool {
+    // TODO: Optimize this? And refactor to use current game state. Have different function to check for illegal moves.
+    pub fn is_in_check(&self, check_white: bool) -> bool {
+        // Find our king's coordinates.
+        let mut king_coord: Option<Coord> = None;
+        for row in self.board.iter() {
+            for piece in row.iter() {
+                if piece.piece_type == PieceType::King && piece.white == check_white {
+                    king_coord = Some(piece.coord);
+                }
+            }
+        }
+
+        // If we can't find our king, something has gone seriously wrong...
+        if king_coord.is_none() {
+            panic!("Could not find king on the board, should be impossible.");
+        }
+
+        // Check all enemy pieces on the board, see if they are attacking our king.
+        for row in self.board.iter() {
+            for piece in row.iter() {
+                if
+                    piece.piece_type != PieceType::None
+                    && piece.white != check_white
+                    && piece.is_attacking_coord(&king_coord.unwrap(), self)
+                {
+                    return true;
+                }
+            }
+        }
+
+        // If we find nothing, we aren't in check.
         return false;
+    }
+
+    pub fn is_in_checkmate(&self) -> bool {
+        return self.is_in_check(!self.white_to_move) && self.get_all_legal_moves().len() == 0;
+    }
+
+    pub fn is_in_stalemate(&self) -> bool {
+        return self.get_all_legal_moves().len() == 0;
     }
 
     // Does not check if a move is legal.

@@ -3,30 +3,79 @@
 use crate::{constants::BOARD_SIZE, coord::Coord, g::{self}};
 
 pub fn run_all_tests(){
-    // Do nothing right now!
-    // let mut game: Game = g::Game::default();
-    let mut game = g::Game::default();
-    game.import_fen("rnbqkbnr/pppppppp/8/8/8/8/1PPPPPPP/RNBQKBNR w KQkq - 0 1");
-    game.print_board();
-    //game.print_all_legal_moves();
-
-    // Testing targeting functions.
-    //let piece = &game.board[6][1]; // Pawn on b2
-    //let piece = &game.board[7][1]; // Knight on b1
-    // let piece = &game.board[7][4]; // King on e1
-    // let piece = &game.board[7][0]; // Rook on a1
-
-    //let coord = str_tile_to_coord("a3");
-    //let coord = str_tile_to_coord("b3");
-    //let coord = str_tile_to_coord("c3");
-    let source_coord = str_tile_to_coord("a1");
-    let target_coord = str_tile_to_coord("b1");
-
-    let source_piece = game.get_piece_at_coord(&source_coord);
-
-    let attacking = source_piece.is_attacking_coord(&target_coord, &game);
-    println!("Tile {} is attacking {}: {}", source_piece.coord, target_coord, attacking);
+    // test_bishop_attacks();
+    // test_queen_attacks();
+    // test_is_in_check();
+    test_legal_moves();
 }
+
+pub fn test_bishop_attacks() {
+    let mut game = g::Game::default();
+    game.import_fen("rnbqkbnr/pppppppp/8/8/8/8/PPP1PPPP/RNBQKBNR w KQkq - 0 1");
+    game.print_board();
+
+    let source_coord = str_tile_to_coord("c1");
+    let source_piece = game.get_piece_at_coord(&source_coord);
+    let str_coords_to_check = vec!["f4", "b2", "c2", "e3"];
+
+    for str_coord in str_coords_to_check.iter() {
+        let target_coord = str_tile_to_coord(&str_coord);
+        let attacking = source_piece.is_attacking_coord(&target_coord, &game);
+        println!("Tile {} is attacking {}: {}", source_piece.coord, target_coord, attacking);
+    }
+}
+
+pub fn test_queen_attacks() {
+    let mut game = g::Game::default();
+    game.import_fen("rnbqkbnr/pppppppp/8/8/8/8/PPP2PPP/RNBQKBNR w KQkq - 0 1");
+    game.print_board();
+
+    let source_coord = str_tile_to_coord("d1");
+    let source_piece = game.get_piece_at_coord(&source_coord);
+    let str_coords_to_check = vec!["d8", "d7", "d2", "c2", "e3"];
+
+    for str_coord in str_coords_to_check.iter() {
+        let target_coord = str_tile_to_coord(&str_coord);
+        let attacking = source_piece.is_attacking_coord(&target_coord, &game);
+        println!("Tile {} is attacking {}: {}", source_piece.coord, target_coord, attacking);
+    }
+}
+
+pub fn test_is_in_check() {
+    let mut game = g::Game::default();
+    // let look_at_white = false;
+    // game.import_fen("rnbqkbnr/ppp2ppp/8/8/8/8/PPP1QPPP/RNB1KBNR w KQkq - 0 1"); // expect: true;
+    // let look_at_white = false;
+    // game.import_fen("rnbqkbnr/pppppppp/8/8/8/8/PPP1QPPP/RNB1KBNR w KQkq - 0 1"); // expect: false;
+    let look_at_white = true;
+    game.import_fen("rn1qkbnr/pppppppp/8/b7/8/8/PPP1QPPP/RNB1KBNR w KQkq - 0 1"); // expect: false;
+    game.print_board();
+
+    let result = game.is_in_check(look_at_white);
+    if look_at_white {
+        println!("Is white in check? {}", result);
+    } else {
+        println!("Is black in check? {}", result);
+    }
+}
+
+pub fn test_legal_moves() {
+    let mut game = g::Game::default();
+    game.import_fen("rn1qkbnr/pppppppp/8/b7/8/8/PPP1QPPP/RNB1KBNR w KQkq - 0 1"); // expect: false;
+    game.print_board();
+    let legal_moves = game.get_all_legal_moves();
+
+    if game.white_to_move {
+        print!("It is white to move. ");
+    } else {
+        print!("It is black to move. ");
+    }
+    println!("Legal moves: ");
+    for m in legal_moves.iter() {
+        print!("{} ", m);
+    }
+}
+
 
 // Helper. Should this be in the coord file?
 fn str_tile_to_coord(s: &str) -> Coord {

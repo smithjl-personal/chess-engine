@@ -79,6 +79,43 @@ impl Piece {
         }
     }
 
+    pub fn can_attack_coord_in_direction(&self, game: &Game, coord: &Coord, dx: i32, dy: i32) -> bool {
+        let mut x = self.coord.x as i32;
+        let mut y = self.coord.y as i32;
+
+        loop {
+            x += dx;
+            y += dy;
+
+            // Perform a bounds check.
+            if x < 0 || y < 0 || x >= BOARD_SIZE as i32 || y >= BOARD_SIZE as i32 {
+                return false;
+            }
+
+            if x as usize == coord.x && y as usize == coord.y {
+                return true;
+            }
+
+            // We need more info to see if we can continue.
+            let piece: &Piece = &game.board[y as usize][x as usize];
+
+            // If square is empty, we can continue.
+            if piece.piece_type == PieceType::None {
+                continue;
+            }
+
+            // We cannot move over our pieces (normally).
+            else if piece.white == self.white {
+                return false;
+            }
+
+            // At this point, we must be on an enemy piece that is not the target square. So we stop here.
+            else {
+                return false;
+            }
+        }
+    } 
+
     pub fn get_legal_moves(&self, game: &Game) -> Vec<Move> {
         let mut moves: Vec<Move> = vec![];
 
@@ -291,12 +328,36 @@ impl Piece {
                 return x_in_range && y_in_range;
             }
             PieceType::Queen => {
-                // TODO: Implement this.
-                return false;
+                let dx: i32;
+                let dy: i32;
+
+                if coord.x > self.coord.x {
+                    dx = 1;
+                }
+                else if coord.x < self.coord.x {
+                    dx = -1;
+                }
+                else {
+                    dx = 0;
+                }
+
+                if coord.y > self.coord.y {
+                    dy = 1;
+                }
+                else if coord.y < self.coord.y {
+                    dy = -1;
+                }
+                else {
+                    dy = 0;
+                }
+
+                /* Consider finding a way to not check impossible directions. */
+                return self.can_attack_coord_in_direction(game, coord, dx, dy);
             }
             PieceType::Rook => {
-                let mut dx = 0;
-                let mut dy = 0;
+                let dx: i32;
+                let dy: i32;
+
                 if self.coord.x == coord.x {
                     dx = 0;
                     if self.coord.y > coord.y {
@@ -320,62 +381,31 @@ impl Piece {
                 // If we don't share the rank or file, we aren't attacking the square.
                 else { return false; }
 
-                // println!("Checking dx {} dy {}", dx, dy);
-
-                // TODO: Extract the below logic into a function that can be used by the queen, rook, and bishop.
-
-                // Now try and move in the direction until we reach the square.
-                let mut check_x_pos = self.coord.x as i32;
-                let mut check_y_pos = self.coord.y as i32;
-                loop {
-
-                    //println!("Beginning loop.");
-
-                    check_x_pos += dx;
-                    check_y_pos += dy;
-
-                    //println!("Looking at coord x {} y {}", check_x_pos, check_y_pos);
-
-                    // Perform a bounds check.
-                    if check_x_pos < 0 || check_y_pos < 0 || check_x_pos >= BOARD_SIZE as i32 || check_y_pos >= BOARD_SIZE as i32{
-                        return false;
-                    }
-
-                    // println!("We are in bounds.");
-
-                    // If we are on the square, we are done.
-                    if check_x_pos as usize == coord.x && check_y_pos as usize == coord.y {
-                        // println!("We are reached the target.");
-                        return true;
-                    }
-
-                    // We need more info to see if we can continue.
-                    let piece = &game.board[check_y_pos as usize][check_x_pos as usize];
-
-                    // println!("{:?}", piece);
-
-                    // If square is empty, we can continue.
-                    if piece.piece_type == PieceType::None {
-                        // println!("Square is empty, keep going.");
-                        continue;
-                    }
-
-                    // We cannot move over our pieces (normally).
-                    else if piece.white == self.white {
-                        //println!("Square is our piece, stop.");
-                        return false;
-                    }
-
-                    // At this point, we must be on an enemy piece that is not the target square. So we stop here.
-                    else {
-                        return false;
-                    }
-                }
+                // Try to attack the square.
+                return self.can_attack_coord_in_direction(game, coord, dx, dy);
             }
             PieceType::Bishop => {
-                // TODO: Implement this.
-                return false;
-                
+                let dx: i32;
+                let dy: i32;
+
+                if coord.x > self.coord.x {
+                    dx = 1;
+                }
+                else if coord.x < self.coord.x {
+                    dx = -1;
+                }
+                else { return false }
+
+                if coord.y > self.coord.y {
+                    dy = 1;
+                }
+                else if coord.y < self.coord.y {
+                    dy = -1;
+                }
+                else { return false }
+
+                /* Consider finding a way to not check impossible directions. */
+                return self.can_attack_coord_in_direction(game, coord, dx, dy);
             }
             PieceType::Knight => {
                 let diff_x_abs: isize = (self.coord.x as isize - coord.x as isize).abs();
