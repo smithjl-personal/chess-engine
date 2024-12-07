@@ -1,11 +1,19 @@
-use std::array;
-use crate::{piece::Piece, my_move::Move, piece_type::PieceType, coord::Coord, constants::BOARD_SIZE};
+use std::{array, io, panic};
+use crate::{
+    constants::{BOARD_SIZE, INITIAL_GAME_STATE_FEN}
+    , coord::Coord
+    , my_move::Move
+    , piece::Piece
+    , piece_type::PieceType
+    , game_states::GameState
+};
 
 // Struct for the chessboard, which is a 2D array of Pieces
 #[derive(Clone)]
 pub struct Game {
     pub board: [[Piece; BOARD_SIZE]; BOARD_SIZE],
     pub white_to_move: bool,
+    pub state: GameState,
     // TODO: Store castling rights?
     // TODO: Store 'en-pessant' state?
     // TODO: Store half-moves since last pawn capture or advance.
@@ -19,6 +27,7 @@ impl Default for Game {
         Game {
             board: array::from_fn(|_i| array::from_fn(|_j| Piece::default())),
             white_to_move: true,
+            state: GameState::InProgress,
         }
     }
 }
@@ -203,6 +212,24 @@ impl Game {
         return self.get_all_legal_moves().len() == 0;
     }
 
+    // There is something wrong with this function right now...
+    pub fn update_game_state(&mut self) {
+        if self.is_in_checkmate() {
+            if self.white_to_move {
+                self.state = GameState::BlackWins;
+            }
+            else {
+                self.state = GameState::WhiteWins;
+            }
+        }
+        else if self.is_in_stalemate() {
+            self.state = GameState::Draw;
+        }
+        else {
+            self.state = GameState::InProgress;
+        }
+    }
+
     // Does not check if a move is legal.
     pub fn make_move(&mut self, m: &Move) {
         // Get the piece that is moving.
@@ -223,5 +250,71 @@ impl Game {
 
         // Make it the other player's turn.
         self.white_to_move = !self.white_to_move;
+
+        // TODO: Run this? Causes stack overflows right now...
+        //self.update_game_state();
+    }
+
+    pub fn play_game_vs_bot(&mut self) {
+
+        
+        self.import_fen(INITIAL_GAME_STATE_FEN);
+        println!("Starting a new game. You are white.");
+
+        let mut iter_counter: i32 = 0;
+        loop {
+            // Print the board.
+            self.print_board();
+
+            // See if game is over.
+            if self.state != GameState::InProgress {
+                self.state.print_game_state();
+                break;
+            }
+
+            // Player move.
+            println!("It is your turn. Enter a move.");
+
+            // Read the user input.
+            let mut input = String::new();
+            io::stdin().read_line(&mut input).expect("Failed to readline. Not sure what went wrong.");
+
+            // Remove endline.
+            input = String::from(input.trim());
+
+            let user_move = match Move::str_to_move(&input) {
+                Ok(m) => m,
+                Err(msg) => {
+                    println!("{}", msg);
+                    continue;
+                }
+            };
+
+            // See if this is in one of the player's legal moves.
+            let player_legal_moves = self.get_all_legal_moves();
+            if !player_legal_moves.contains(&user_move) {
+                println!("That is not one of your legal moves. Try again.");
+                continue;
+            }
+
+            // Make the move!
+            self.make_move(&user_move);
+
+            println!("Made the move...");
+
+            // See if game is over.
+            if self.state != GameState::InProgress {
+                self.state.print_game_state();
+                break;
+            }
+
+            // TODO: Let the bot make a move.
+
+            // Temporary guard for oopsies...
+            iter_counter += 1;
+            if iter_counter > 1000 {
+                panic!("Dev likely did something wrong, hit 1000 iterations.");
+            }
+        }
     }
 }

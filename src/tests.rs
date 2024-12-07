@@ -6,7 +6,8 @@ pub fn run_all_tests(){
     // test_bishop_attacks();
     // test_queen_attacks();
     // test_is_in_check();
-    test_legal_moves();
+    // test_legal_moves();
+    test_game_vs_bot();
 }
 
 pub fn test_bishop_attacks() {
@@ -76,6 +77,10 @@ pub fn test_legal_moves() {
     }
 }
 
+pub fn test_game_vs_bot() {
+    let mut game = g::Game::default();
+    game.play_game_vs_bot();
+}
 
 // Helper. Should this be in the coord file?
 fn str_tile_to_coord(s: &str) -> Coord {
