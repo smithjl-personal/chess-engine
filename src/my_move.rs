@@ -4,7 +4,8 @@ use crate::coord::Coord;
 pub struct Move {
     pub from: Coord,
     pub to: Coord,
-    pub is_capture: bool,
+    pub is_capture: Option<bool>,
+    pub en_pessant_target_coord: Option<Coord>,
     // TODO: Consider storing if move is a capture, and if move is a check. Will help find good moves.
 }
 
@@ -29,7 +30,10 @@ impl Move {
         let m = Move {
             from: from,
             to: to,
-            is_capture: false, // TODO: Make this a `None` option.
+
+            // We don't know this data without the board.
+            is_capture: None,
+            en_pessant_target_coord: None,
         };
 
         return Ok(m);

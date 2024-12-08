@@ -1,6 +1,6 @@
 use std::{array, io, panic};
 use crate::{
-    constants::{BOARD_SIZE, INITIAL_GAME_STATE_FEN}
+    constants::BOARD_SIZE
     , coord::Coord
     , my_move::Move
     , piece::Piece
@@ -15,6 +15,7 @@ pub struct Game {
     pub white_to_move: bool,
     pub state: GameState,
     pub legal_moves: Vec<Move>,
+    pub en_passant_target: Option<Coord>,
     // TODO: Store castling rights?
     // TODO: Store 'en-pessant' state?
     // TODO: Store half-moves since last pawn capture or advance.
@@ -30,6 +31,7 @@ impl Default for Game {
             white_to_move: true,
             state: GameState::InProgress,
             legal_moves: vec![],
+            en_passant_target: None,
         }
     }
 }
@@ -113,6 +115,7 @@ impl Game {
         return fen;
     }
 
+    // TODO: Consider robust error handling rather than `panic` usage.
     pub fn import_fen(&mut self, fen: &str) {
         // Trim the string.
         let trimmed_full_fen = fen.trim();
@@ -196,6 +199,35 @@ impl Game {
         } else {
             panic!("Unexpected character for whose turn it is: {}. Should be 'w' or 'b'.", whose_turn);
         }
+
+        // Castling.
+        let castling_rights_str = parts.next();
+        match castling_rights_str {
+            Some(s) => {
+                // TODO: Implement this.
+            },
+            None => { return },
+        }
+
+        // En-Passant target.
+        let en_passant_target_str = parts.next();
+        match en_passant_target_str {
+            Some(s) => {
+                // Try to parse the string as a coordinate.
+                let parsed_coord = Coord::str_to_coord(s);
+                if parsed_coord.is_ok() {
+                    self.en_passant_target = Some(parsed_coord.unwrap());
+                }
+                else {
+                    self.en_passant_target = None;
+                }
+            },
+            None => { return },
+        }
+
+        // Half-Moves since last pawn move (for 50 move rule).
+
+        // Full move count. Incremented after black moves.
     }
 
     pub fn get_all_legal_moves(&self) -> Vec<Move> {
@@ -267,7 +299,6 @@ impl Game {
         cloned_game.board[m.to.y][m.to.x] = piece_to_move;
 
         // Correct the coordinates, and the moved status.
-        cloned_game.board[m.to.y][m.to.x].has_moved = true;
         cloned_game.board[m.to.y][m.to.x].coord = Coord {
             x: m.to.x,
             y: m.to.y,
@@ -309,12 +340,25 @@ impl Game {
     pub fn make_move(&mut self, m: &Move) {
         // Get the piece that is moving.
         let piece_to_move = self.board[m.from.y][m.from.x].clone();
+        let target_square = &self.board[m.to.y][m.to.x];
+
+        /*
+            Special check for en-passant captures. If we are moving a pawn to an empty square and we are capturing,
+            this is an en-passant capture. As such, we need to delete the piece at the en-passant square as well.
+        */
+        if
+            piece_to_move.piece_type == PieceType::Pawn
+            && target_square.piece_type == PieceType::None
+            && m.is_capture == Some(true)
+        {
+            let y_offset_to_clear: usize = if self.white_to_move {m.to.y + 1} else {m.to.y - 1};
+            self.board[y_offset_to_clear][m.to.x].piece_type = PieceType::None;
+        }
 
         // Make the new square the new piece.
         self.board[m.to.y][m.to.x] = piece_to_move;
 
         // Correct the coordinates, and the moved status.
-        self.board[m.to.y][m.to.x].has_moved = true;
         self.board[m.to.y][m.to.x].coord = Coord {
             x: m.to.x,
             y: m.to.y,
@@ -322,6 +366,9 @@ impl Game {
 
         // Clear out the old square.
         self.board[m.from.y][m.from.x].piece_type = PieceType::None;
+
+        // Track en-passant target data.
+        self.en_passant_target = m.en_pessant_target_coord;
 
         // Make it the other player's turn.
         self.white_to_move = !self.white_to_move;
@@ -357,8 +404,13 @@ impl Game {
         }
 
         println!(" And they have {} legal moves.", self.legal_moves.len());
+        print!("En-Passant target square: ");
+        match self.en_passant_target {
+            Some(t) => println!("{}", t),
+            None => println!("None"),
+        }
 
-        println!("In check? {}", self.is_in_check())
+        println!("In check? {}", self.is_in_check());
     }
 
     pub fn play_game_vs_bot(&mut self) {
@@ -366,7 +418,9 @@ impl Game {
         
         //self.import_fen(INITIAL_GAME_STATE_FEN);
         //self.import_fen("rnb1kbnr/pppp1ppp/11111111/1111p111/1111PP1q/111111P1/PPPP111P/RNBQKBNR b");
-        self.import_fen("rnbqkbnr/pppp1ppp/8/4p3/5PP1/8/PPPPP2P/RNBQKBNR b"); // M1 for black.
+        //self.import_fen("rnbqkbnr/pppp1ppp/8/4p3/5PP1/8/PPPPP2P/RNBQKBNR b"); // M1 for black.
+        //self.import_fen("rnbqkbnr/p1pppppp/8/1p3P2/8/8/PPPPP1PP/RNBQKBNR b KQkq - 0 2"); // Testing for en-passant.
+        self.import_fen("rnbqkbnr/p1pp1ppp/8/1p2pP2/8/8/PPPPP1PP/RNBQKBNR w KQkq e6 0 3"); // Direct capture allowed.
         self.update_legal_moves();
         println!("Starting a new game. You are white.");
 
@@ -398,7 +452,13 @@ impl Game {
                 continue;
             }
 
-            let user_move = match Move::str_to_move(&input) {
+            // TEMPORARY DEBUG OUTPUT GAME STATE
+            if input == "debug" {
+                self.print_debug_game_state();
+                continue;
+            }
+
+            let user_move_raw = match Move::str_to_move(&input) {
                 Ok(m) => m,
                 Err(msg) => {
                     println!("{}", msg);
@@ -406,15 +466,23 @@ impl Game {
                 }
             };
 
-            // See if this is in one of the player's legal moves.
-            if !self.legal_moves.contains(&user_move) {
-                println!("That is not one of your legal moves. Try again.");
-                self.print_all_legal_moves();
-                continue;
+            // Grab the move from the game, it has more data (capture, en-passant, etc).
+            let mut user_move: Option<Move> = None;
+            for m in self.legal_moves.iter() {
+                if m == &user_move_raw {
+                    user_move = Some(m.clone());
+                    break;
+                }
             }
 
-            // Make the move!
-            self.make_move(&user_move);
+            match user_move {
+                Some(m) => self.make_move(&m),
+                None => {
+                    println!("That is not one of your legal moves. Try again.");
+                    self.print_all_legal_moves();
+                    continue;
+                }
+            }
 
             println!("Made the move...");
 

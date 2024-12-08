@@ -11,10 +11,6 @@ pub struct Piece {
 
     // To see our legal moves, we track the position of each actual piece.
     pub coord: Coord,
-
-    // Important for castling, and pawns.
-    // TODO: Refactor this, to remove it. Use standard FEN data tracked at the game level.
-    pub has_moved: bool,
 }
 
 // Implement the Default trait for Piece
@@ -29,8 +25,6 @@ impl Default for Piece {
                 x: 0,
                 y: 0,
             },
-
-            has_moved: false,
         }
     }
 }
@@ -62,7 +56,12 @@ impl Piece {
             if game.board[y_usize][x_usize].piece_type == PieceType::None {
                 let from_tile = self.coord;
                 let to_tile = Coord { x: x_usize, y: y_usize };
-                moves.push(Move { from: from_tile, to: to_tile, is_capture: false, });
+                moves.push(Move {
+                    from: from_tile,
+                    to: to_tile,
+                    is_capture: Some(false),
+                    en_pessant_target_coord: None,
+                });
             }
 
             // If the tile contains a friendly piece, stop in that direction.
@@ -74,7 +73,12 @@ impl Piece {
             else {
                 let from_tile = self.coord;
                 let to_tile = Coord { x: x_usize, y: y_usize };
-                moves.push(Move { from: from_tile, to: to_tile, is_capture: true, });
+                moves.push(Move {
+                    from: from_tile,
+                    to: to_tile,
+                    is_capture: Some(true),
+                    en_pessant_target_coord: None,
+                });
                 break;
             }
         }
@@ -141,7 +145,8 @@ impl Piece {
                             moves.push(Move {
                                 from: self.coord,
                                 to: target_piece.coord,
-                                is_capture: false,
+                                is_capture: Some(false),
+                                en_pessant_target_coord: None,
                             });
                         }
 
@@ -155,14 +160,14 @@ impl Piece {
                             moves.push(Move {
                                 from: self.coord,
                                 to: target_piece.coord,
-                                is_capture: true,
+                                is_capture: Some(true),
+                                en_pessant_target_coord: None,
                             });
                         }
                     }
                 }
 
                 // TODO: Check for castling.
-                if !self.has_moved {}
             }
             PieceType::Queen => {
                 // Right
@@ -237,7 +242,8 @@ impl Piece {
                         moves.push(Move {
                             from: self.coord,
                             to: target_square.coord,
-                            is_capture: false,
+                            is_capture: Some(false),
+                            en_pessant_target_coord: None,
                         });
                     }
 
@@ -246,7 +252,8 @@ impl Piece {
                         moves.push(Move {
                             from: self.coord,
                             to: target_square.coord,
-                            is_capture: true,
+                            is_capture: Some(true),
+                            en_pessant_target_coord: None,
                         });
                     }
                 }
@@ -254,6 +261,7 @@ impl Piece {
             PieceType::Pawn => {
                 // White pawns go up the board, black ones go down.
                 let direction: i32 = if self.white {-1} else {1};
+                let pawn_starting_coord_y: usize = if self.white {6} else {1};
 
                 // We do not need to do any bounds checking for normal moves because of how pawn moves work.
                 // If a pawn makes it to the top/bottom rank, it promotes and is no longer a pawn.
@@ -272,30 +280,42 @@ impl Piece {
                     moves.push(Move {
                         from: self.coord,
                         to: target.coord,
-                        is_capture: false,
+                        is_capture: Some(false),
+                        en_pessant_target_coord: None,
                     });
 
-                    // Check for double square move if we haven't moved yet.
-                    if !self.has_moved {
+                    // If pawn is on it's starting square, look for double moves.
+                    if self.coord.y == pawn_starting_coord_y {
                         let extra_target = &game.board[(y_pos + direction) as usize][self.coord.x];
                         if extra_target.piece_type == PieceType::None {
                             moves.push(Move {
                                 from: self.coord,
                                 to: extra_target.coord,
-                                is_capture: false,
+                                is_capture: Some(false),
+                                en_pessant_target_coord: Some(Coord {
+                                    x: self.coord.x,
+                                    y: y_pos as usize,
+                                }),
                             });
                         }
                     }
                 }
 
-                // Check the left.
+                // Check the left captures.
                 if self.coord.x as i32 - 1 >= 0 {
                     let target_coord = Coord {
                         x: self.coord.x - 1,
                         y: y_pos as usize,
                     };
 
-                    // TODO: Check for en-passant.
+                    if game.en_passant_target == Some(target_coord) {
+                        moves.push(Move {
+                            from: self.coord,
+                            to: target_coord,
+                            is_capture: Some(true),
+                            en_pessant_target_coord: None, 
+                        });
+                    }
 
                     // See if tile is enemy piece.
                     let piece = game.get_piece_at_coord(&target_coord);
@@ -303,19 +323,27 @@ impl Piece {
                         moves.push(Move {
                             from: self.coord,
                             to: target_coord,
-                            is_capture: true,
+                            is_capture: Some(true),
+                            en_pessant_target_coord: None, 
                         });
                     }
                 }
 
-                // Check the right.
+                // Check the right captures.
                 if self.coord.x + 1 < BOARD_SIZE {
                     let target_coord = Coord {
                         x: self.coord.x + 1,
                         y: y_pos as usize,
                     };
 
-                    // TODO: Check for en-passant.
+                    if game.en_passant_target == Some(target_coord) {
+                        moves.push(Move {
+                            from: self.coord,
+                            to: target_coord,
+                            is_capture: Some(true),
+                            en_pessant_target_coord: None, 
+                        });
+                    }
 
                     // See if tile is enemy piece.
                     let piece = game.get_piece_at_coord(&target_coord);
@@ -323,7 +351,8 @@ impl Piece {
                         moves.push(Move {
                             from: self.coord,
                             to: target_coord,
-                            is_capture: true,
+                            is_capture: Some(true),
+                            en_pessant_target_coord: None,
                         });
                     }
                 }
