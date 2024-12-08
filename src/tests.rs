@@ -52,7 +52,7 @@ pub fn test_is_in_check() {
     game.import_fen("rn1qkbnr/pppppppp/8/b7/8/8/PPP1QPPP/RNB1KBNR w KQkq - 0 1"); // expect: false;
     game.print_board();
 
-    let result = game.is_in_check(look_at_white);
+    let result = game.is_in_check();
     if look_at_white {
         println!("Is white in check? {}", result);
     } else {

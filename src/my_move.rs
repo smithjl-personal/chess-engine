@@ -1,6 +1,6 @@
 use crate::coord::Coord;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone)]
 pub struct Move {
     pub from: Coord,
     pub to: Coord,
@@ -39,5 +39,12 @@ impl Move {
 impl std::fmt::Display for Move {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}{}", self.from, self.to)
+    }
+}
+
+// When comparing moves, we only care about the `from` and `to`. The other fields are for other parts of the program.
+impl PartialEq for Move {
+    fn eq(&self, other: &Self) -> bool {
+        self.from == other.from && self.to == other.to
     }
 }

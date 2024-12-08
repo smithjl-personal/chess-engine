@@ -13,6 +13,7 @@ pub struct Piece {
     pub coord: Coord,
 
     // Important for castling, and pawns.
+    // TODO: Refactor this, to remove it. Use standard FEN data tracked at the game level.
     pub has_moved: bool,
 }
 
@@ -258,6 +259,11 @@ impl Piece {
                 // If a pawn makes it to the top/bottom rank, it promotes and is no longer a pawn.
                 let y_pos: i32 = self.coord.y as i32 + direction;
 
+                // This condition should be impossible. But just in case...
+                if y_pos < 0 || y_pos >= BOARD_SIZE as i32 {
+                    return moves;
+                }
+
                 // Check moves, not captures here.
                 let target = &game.board[y_pos as usize][self.coord.x];
                 if target.piece_type == PieceType::None {
@@ -282,7 +288,45 @@ impl Piece {
                     }
                 }
 
-                // TODO: Now check captures. We do need bounds checks here.
+                // Check the left.
+                if self.coord.x as i32 - 1 >= 0 {
+                    let target_coord = Coord {
+                        x: self.coord.x - 1,
+                        y: y_pos as usize,
+                    };
+
+                    // TODO: Check for en-passant.
+
+                    // See if tile is enemy piece.
+                    let piece = game.get_piece_at_coord(&target_coord);
+                    if piece.piece_type != PieceType::None && piece.white != self.white {
+                        moves.push(Move {
+                            from: self.coord,
+                            to: target_coord,
+                            is_capture: true,
+                        });
+                    }
+                }
+
+                // Check the right.
+                if self.coord.x + 1 < BOARD_SIZE {
+                    let target_coord = Coord {
+                        x: self.coord.x + 1,
+                        y: y_pos as usize,
+                    };
+
+                    // TODO: Check for en-passant.
+
+                    // See if tile is enemy piece.
+                    let piece = game.get_piece_at_coord(&target_coord);
+                    if piece.piece_type != PieceType::None && piece.white != self.white {
+                        moves.push(Move {
+                            from: self.coord,
+                            to: target_coord,
+                            is_capture: true,
+                        });
+                    }
+                }
             }
             PieceType::None => {
                 return moves;
@@ -300,16 +344,13 @@ impl Piece {
          */
 
         // Try out every move. See if it's illegal.
+        //println!("Removing illegal moves.");
         let mut moves_final: Vec<Move> = vec![];
         for m in moves.iter() {
-            // TODO: Refactor this. Most of this should not need to be in the loop, with good code.
-
-            // Make a duplicate of this game object.
-            let mut game_copy = game.clone();
-
-            game_copy.make_move(m);
-            if !game_copy.is_in_check(game.white_to_move) {
+            if !game.does_move_put_self_in_check(m) {
                 moves_final.push(m.clone());
+            } else {
+                println!("Move {} is illegal. Removing.", m);
             }
         }
 

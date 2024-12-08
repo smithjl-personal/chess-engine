@@ -14,6 +14,7 @@ pub struct Game {
     pub board: [[Piece; BOARD_SIZE]; BOARD_SIZE],
     pub white_to_move: bool,
     pub state: GameState,
+    pub legal_moves: Vec<Move>,
     // TODO: Store castling rights?
     // TODO: Store 'en-pessant' state?
     // TODO: Store half-moves since last pawn capture or advance.
@@ -28,6 +29,7 @@ impl Default for Game {
             board: array::from_fn(|_i| array::from_fn(|_j| Piece::default())),
             white_to_move: true,
             state: GameState::InProgress,
+            legal_moves: vec![],
         }
     }
 }
@@ -61,6 +63,54 @@ impl Game {
             }
             println!();
         }
+    }
+
+    pub fn export_fen(&self) -> String {
+        let mut fen = String::new();
+    
+        for (i, row) in self.board.iter().enumerate() {
+            let mut empty_count = 0;
+    
+            for piece in row.iter() {
+                if piece.piece_type == PieceType::None {
+                    empty_count += 1; // Increase the empty square count
+                }
+                else {
+                    // Append the count of empty squares if any
+                    if empty_count > 0 {
+                        fen += &empty_count.to_string();
+                        empty_count = 0; // Reset the count after using it
+                    }
+    
+                    // Convert piece type to the FEN character (uppercase for white, lowercase for black)
+                    let mut letter = PieceType::to_char(piece.piece_type).to_string();
+                    if piece.white {
+                        letter = letter.to_ascii_uppercase();
+                    }
+    
+                    fen += &letter;
+                }
+            }
+    
+            // Append any remaining empty squares at the end of the row
+            if empty_count > 0 {
+                fen += &empty_count.to_string();
+            }
+    
+            // Add '/' separator if it's not the last row
+            if i < BOARD_SIZE - 1 {
+                fen += "/";
+            }
+        }
+    
+        // Add the game status (turn to move)
+        if self.white_to_move {
+            fen += " w";
+        } else {
+            fen += " b";
+        }
+    
+        return fen;
     }
 
     pub fn import_fen(&mut self, fen: &str) {
@@ -170,13 +220,13 @@ impl Game {
         return &self.board[coord.y][coord.x];
     }
 
-    // TODO: Optimize this? And refactor to use current game state. Have different function to check for illegal moves.
-    pub fn is_in_check(&self, check_white: bool) -> bool {
+    // TODO: Optimize this? And refactor to use current game state.
+    pub fn is_in_check(&self) -> bool {
         // Find our king's coordinates.
         let mut king_coord: Option<Coord> = None;
         for row in self.board.iter() {
             for piece in row.iter() {
-                if piece.piece_type == PieceType::King && piece.white == check_white {
+                if piece.piece_type == PieceType::King && piece.white == self.white_to_move {
                     king_coord = Some(piece.coord);
                 }
             }
@@ -192,7 +242,7 @@ impl Game {
             for piece in row.iter() {
                 if
                     piece.piece_type != PieceType::None
-                    && piece.white != check_white
+                    && piece.white != self.white_to_move
                     && piece.is_attacking_coord(&king_coord.unwrap(), self)
                 {
                     return true;
@@ -204,12 +254,37 @@ impl Game {
         return false;
     }
 
+    pub fn does_move_put_self_in_check(&self, m: &Move) -> bool {
+        // println!("Trying to make move, see if we are in check.");
+
+        // Make the move on a cloned board, see if it works.
+        let mut cloned_game = self.clone();
+
+        // Get the piece that is moving.
+        let piece_to_move = cloned_game.board[m.from.y][m.from.x].clone();
+
+        // Make the new square the new piece.
+        cloned_game.board[m.to.y][m.to.x] = piece_to_move;
+
+        // Correct the coordinates, and the moved status.
+        cloned_game.board[m.to.y][m.to.x].has_moved = true;
+        cloned_game.board[m.to.y][m.to.x].coord = Coord {
+            x: m.to.x,
+            y: m.to.y,
+        };
+
+        // Clear out the old square.
+        cloned_game.board[m.from.y][m.from.x].piece_type = PieceType::None;
+
+        return cloned_game.is_in_check();
+    }
+
     pub fn is_in_checkmate(&self) -> bool {
-        return self.is_in_check(!self.white_to_move) && self.get_all_legal_moves().len() == 0;
+        return self.is_in_check() && self.legal_moves.len() == 0;
     }
 
     pub fn is_in_stalemate(&self) -> bool {
-        return self.get_all_legal_moves().len() == 0;
+        return !self.is_in_check() && self.legal_moves.len() == 0;
     }
 
     // There is something wrong with this function right now...
@@ -230,7 +305,7 @@ impl Game {
         }
     }
 
-    // Does not check if a move is legal.
+    // Does not check if a move is legal. Also updates game state.
     pub fn make_move(&mut self, m: &Move) {
         // Get the piece that is moving.
         let piece_to_move = self.board[m.from.y][m.from.x].clone();
@@ -251,14 +326,48 @@ impl Game {
         // Make it the other player's turn.
         self.white_to_move = !self.white_to_move;
 
+        // Update legal moves in the position.
+        self.update_legal_moves();
+
         // TODO: Run this? Causes stack overflows right now...
-        //self.update_game_state();
+        self.update_game_state();
+    }
+
+    pub fn update_legal_moves(&mut self) {
+        self.legal_moves.clear();
+        self.legal_moves = self.get_all_legal_moves();
+    }
+
+    pub fn print_all_legal_moves(&self) {
+        print!("All legal moves: ");
+        for m in self.legal_moves.iter() {
+            print!("{} ", m);
+        }
+        println!();
+    }
+
+    pub fn print_debug_game_state(&self) {
+        print!("Game state: ");
+        self.state.print_game_state();
+
+        if self.white_to_move {
+            print!("It is white to move.");
+        } else {
+            print!("It is black to move.");
+        }
+
+        println!(" And they have {} legal moves.", self.legal_moves.len());
+
+        println!("In check? {}", self.is_in_check())
     }
 
     pub fn play_game_vs_bot(&mut self) {
 
         
-        self.import_fen(INITIAL_GAME_STATE_FEN);
+        //self.import_fen(INITIAL_GAME_STATE_FEN);
+        //self.import_fen("rnb1kbnr/pppp1ppp/11111111/1111p111/1111PP1q/111111P1/PPPP111P/RNBQKBNR b");
+        self.import_fen("rnbqkbnr/pppp1ppp/8/4p3/5PP1/8/PPPPP2P/RNBQKBNR b"); // M1 for black.
+        self.update_legal_moves();
         println!("Starting a new game. You are white.");
 
         let mut iter_counter: i32 = 0;
@@ -268,7 +377,8 @@ impl Game {
 
             // See if game is over.
             if self.state != GameState::InProgress {
-                self.state.print_game_state();
+                //self.state.print_game_state();
+                self.print_debug_game_state();
                 break;
             }
 
@@ -282,6 +392,12 @@ impl Game {
             // Remove endline.
             input = String::from(input.trim());
 
+            // TEMPORARY DEBUG OUTPUT FEN
+            if input == "export" {
+                println!("{}", self.export_fen());
+                continue;
+            }
+
             let user_move = match Move::str_to_move(&input) {
                 Ok(m) => m,
                 Err(msg) => {
@@ -291,9 +407,9 @@ impl Game {
             };
 
             // See if this is in one of the player's legal moves.
-            let player_legal_moves = self.get_all_legal_moves();
-            if !player_legal_moves.contains(&user_move) {
+            if !self.legal_moves.contains(&user_move) {
                 println!("That is not one of your legal moves. Try again.");
+                self.print_all_legal_moves();
                 continue;
             }
 
@@ -304,7 +420,9 @@ impl Game {
 
             // See if game is over.
             if self.state != GameState::InProgress {
-                self.state.print_game_state();
+                self.print_board();
+                //self.state.print_game_state();
+                self.print_debug_game_state();
                 break;
             }
 
