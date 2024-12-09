@@ -3,11 +3,10 @@ use crate::{piece_type::PieceType, coord::Coord, g::Game, my_move::Move};
 
 
 // Struct for each piece on the board
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct Piece {
     pub piece_type: PieceType,
     pub white: bool,
-    pub short_name: String,
 
     // To see our legal moves, we track the position of each actual piece.
     pub coord: Coord,
@@ -19,7 +18,6 @@ impl Default for Piece {
         Piece {
             piece_type: PieceType::None,
             white: false,
-            short_name: String::from(""),
 
             coord: Coord {
                 x: 0,

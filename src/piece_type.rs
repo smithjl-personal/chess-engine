@@ -10,8 +10,8 @@ pub enum PieceType {
 }
 
 impl PieceType {
-    pub fn to_char(piece_type: PieceType) -> char {
-        match piece_type {
+    pub fn to_char(piece_type: PieceType, white: bool) -> char {
+        let c = match piece_type {
             Self::King => 'k',
             Self::Queen => 'q',
             Self::Rook => 'r',
@@ -19,6 +19,12 @@ impl PieceType {
             Self::Knight => 'n',
             Self::Pawn => 'p',
             Self::None => ' ',
+        };
+
+        if white {
+            return c.to_ascii_uppercase();
+        } else {
+            return c;
         }
     }
 }

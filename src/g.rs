@@ -16,10 +16,15 @@ pub struct Game {
     pub state: GameState,
     pub legal_moves: Vec<Move>,
     pub en_passant_target: Option<Coord>,
-    // TODO: Store castling rights?
-    // TODO: Store 'en-pessant' state?
-    // TODO: Store half-moves since last pawn capture or advance.
-    // TODO: Store full-move count (increment after black moves).
+
+    // Is there a better way to store this data?
+    pub can_white_castle_long: bool,
+    pub can_white_castle_short: bool,
+    pub can_black_castle_long: bool,
+    pub can_black_castle_short: bool,
+
+    pub full_move_count: u32,
+    pub half_move_count_non_pawn_non_capture: u32,
 }
 
 // Implement the Default trait for Board
@@ -32,6 +37,14 @@ impl Default for Game {
             state: GameState::InProgress,
             legal_moves: vec![],
             en_passant_target: None,
+
+            can_white_castle_long: true,
+            can_white_castle_short: true,
+            can_black_castle_long: true,
+            can_black_castle_short: true,
+
+            full_move_count: 1,
+            half_move_count_non_pawn_non_capture: 0,
         }
     }
 }
@@ -44,10 +57,7 @@ impl Game {
         for (y, row) in self.board.iter().enumerate() {
             print!("{} |", BOARD_SIZE - y);
             for piece in row.iter() {
-                let display: &str = match piece.piece_type {
-                    PieceType::None => " ",
-                    _=> &piece.short_name,
-                };
+                let display: char = PieceType::to_char(piece.piece_type, piece.white);
 
                 print!(" {} |", display);
             }
@@ -85,11 +95,7 @@ impl Game {
                     }
     
                     // Convert piece type to the FEN character (uppercase for white, lowercase for black)
-                    let mut letter = PieceType::to_char(piece.piece_type).to_string();
-                    if piece.white {
-                        letter = letter.to_ascii_uppercase();
-                    }
-    
+                    let letter = PieceType::to_char(piece.piece_type, piece.white).to_string();
                     fen += &letter;
                 }
             }
@@ -159,7 +165,6 @@ impl Game {
                 // Place the piece on the board.
                 let piece = &mut self.board[y_pos][x_pos];
                 piece.white = c.is_ascii_uppercase();
-                piece.short_name = c.to_string();
                 piece.piece_type = match c.to_ascii_lowercase() {
                     'k' => PieceType::King,
                     'q' => PieceType::Queen,
@@ -203,7 +208,7 @@ impl Game {
         // Castling.
         let castling_rights_str = parts.next();
         match castling_rights_str {
-            Some(s) => {
+            Some(_s) => {
                 // TODO: Implement this.
             },
             None => { return },
@@ -369,6 +374,18 @@ impl Game {
 
         // Track en-passant target data.
         self.en_passant_target = m.en_pessant_target_coord;
+
+        if m.is_capture == Some(true) || piece_to_move.piece_type == PieceType::Pawn {
+            self.half_move_count_non_pawn_non_capture = 0;
+        }
+        else {
+            self.half_move_count_non_pawn_non_capture += 1;
+        }
+
+        // Track full move counter.
+        if !self.white_to_move {
+            self.full_move_count += 1;
+        }
 
         // Make it the other player's turn.
         self.white_to_move = !self.white_to_move;
