@@ -230,9 +230,29 @@ impl Game {
             None => { return },
         }
 
-        // Half-Moves since last pawn move (for 50 move rule).
+        // Half-Moves since last pawn move and capture (for 50 move rule).
+        let half_move_str = parts.next();
+        match half_move_str {
+            Some(s) => {
+                let parsed_number: Result<u32, _> = s.parse();
+                if parsed_number.is_ok() {
+                    self.half_move_count_non_pawn_non_capture = parsed_number.unwrap();
+                }
+            },
+            None => { return }
+        }
 
         // Full move count. Incremented after black moves.
+        let full_move_count_str = parts.next();
+        match full_move_count_str {
+            Some(s) => {
+                let parsed_number: Result<u32, _> = s.parse();
+                if parsed_number.is_ok() {
+                    self.full_move_count = parsed_number.unwrap();
+                }
+            },
+            None => { return }
+        }
     }
 
     pub fn get_all_legal_moves(&self) -> Vec<Move> {
@@ -428,6 +448,8 @@ impl Game {
         }
 
         println!("In check? {}", self.is_in_check());
+        println!("Full move count: {}", self.full_move_count);
+        println!("Half moves with no capture and pawn move: {}", self.half_move_count_non_pawn_non_capture);
     }
 
     pub fn play_game_vs_bot(&mut self) {
