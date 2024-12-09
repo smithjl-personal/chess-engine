@@ -1,5 +1,6 @@
 pub mod piece_type;
 pub mod game_states;
+pub mod castle_sides;
 pub mod coord;
 pub mod piece;
 pub mod my_move;

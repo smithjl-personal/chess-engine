@@ -6,6 +6,7 @@ use crate::{
     , piece::Piece
     , piece_type::PieceType
     , game_states::GameState
+    , castle_sides::CastleSides
 };
 
 // Struct for the chessboard, which is a 2D array of Pieces
@@ -365,6 +366,51 @@ impl Game {
     pub fn make_move(&mut self, m: &Move) {
         // Get the piece that is moving.
         let piece_to_move = self.board[m.from.y][m.from.x].clone();
+
+        // Special logic involving casting rights.
+        if piece_to_move.piece_type == PieceType::King {
+            if piece_to_move.white {
+                self.can_white_castle_short = false;
+                self.can_white_castle_long = false;
+            } else {
+                self.can_black_castle_short = false;
+                self.can_black_castle_long = false;
+            }
+        }
+
+        // If the rook is leaving it's initial square, we can no longer castle that way.
+        // TODO: Clean this up. There has to be a better way of storing this.
+        if piece_to_move.piece_type == PieceType::Rook {
+            if
+                piece_to_move.white
+                && self.can_white_castle_short
+                && piece_to_move.coord == CastleSides::get_rook_start_coord(&CastleSides::Short, true)
+            {
+                self.can_white_castle_short = false;
+            }
+            else if
+                piece_to_move.white
+                && self.can_white_castle_long
+                && piece_to_move.coord == CastleSides::get_rook_start_coord(&CastleSides::Long, true)
+            {
+                self.can_white_castle_long = false;
+            }
+            else if
+                !piece_to_move.white
+                && self.can_black_castle_short
+                && piece_to_move.coord == CastleSides::get_rook_start_coord(&CastleSides::Short, false)
+            {
+                self.can_black_castle_short = false;
+            }
+            else if
+                !piece_to_move.white
+                && self.can_black_castle_long
+                && piece_to_move.coord == CastleSides::get_rook_start_coord(&CastleSides::Long, false)
+            {
+                self.can_black_castle_long = false;
+            }
+        }
+
         let target_square = &self.board[m.to.y][m.to.x];
 
         /*
@@ -459,7 +505,9 @@ impl Game {
         //self.import_fen("rnb1kbnr/pppp1ppp/11111111/1111p111/1111PP1q/111111P1/PPPP111P/RNBQKBNR b");
         //self.import_fen("rnbqkbnr/pppp1ppp/8/4p3/5PP1/8/PPPPP2P/RNBQKBNR b"); // M1 for black.
         //self.import_fen("rnbqkbnr/p1pppppp/8/1p3P2/8/8/PPPPP1PP/RNBQKBNR b KQkq - 0 2"); // Testing for en-passant.
-        self.import_fen("rnbqkbnr/p1pp1ppp/8/1p2pP2/8/8/PPPPP1PP/RNBQKBNR w KQkq e6 0 3"); // Direct capture allowed.
+        //self.import_fen("rnbqkbnr/p1pp1ppp/8/1p2pP2/8/8/PPPPP1PP/RNBQKBNR w KQkq e6 0 3"); // Direct capture allowed.
+        //self.import_fen("rnbqkbnr/pppppppp/8/8/4B3/4N3/PPPPPPPP/RNBQK2R w KQkq - 0 1"); // Can castle short?
+        self.import_fen("rnbqkbnr/pppppppp/8/8/1QN1B3/2B1N3/PPPPPPPP/R3K2R w KQkq - 0 1"); // Can castle long and short.
         self.update_legal_moves();
         println!("Starting a new game. You are white.");
 

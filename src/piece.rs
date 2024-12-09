@@ -1,5 +1,5 @@
 use crate::constants::{BOARD_SIZE, KNIGHT_MOVES};  // Importing the constant
-use crate::{piece_type::PieceType, coord::Coord, g::Game, my_move::Move};
+use crate::{piece_type::PieceType, coord::Coord, g::Game, my_move::Move, castle_sides::CastleSides};
 
 
 // Struct for each piece on the board
@@ -165,7 +165,14 @@ impl Piece {
                     }
                 }
 
-                // TODO: Check for castling.
+                if self.can_castle(game, CastleSides::Short) {
+                    // TODO: Store the move instead of printing.
+                    println!("Can castle short");
+                }
+                if self.can_castle(game, CastleSides::Long) {
+                    // TODO: Store the move instead of printing.
+                    println!("Can castle long");
+                }
             }
             PieceType::Queen => {
                 // Right
@@ -382,6 +389,73 @@ impl Piece {
         }
 
         return moves_final;
+    }
+
+    pub fn can_castle(&self, game: &Game, dir: CastleSides) -> bool {
+        let mut coords_should_be_empty: Vec<Coord> = vec![];
+
+        match dir {
+            CastleSides::Short => {
+                if self.white && !game.can_white_castle_short {
+                    return false;
+                }
+                if !self.white && !game.can_black_castle_short {
+                    return false;
+                }
+                coords_should_be_empty.push(Coord {
+                    x: self.coord.x + 1,
+                    y: self.coord.y,
+                });
+                coords_should_be_empty.push(Coord {
+                    x: self.coord.x + 2,
+                    y: self.coord.y,
+                });
+            }
+            CastleSides::Long => {
+                if self.white && !game.can_white_castle_long {
+                    return false;
+                }
+                if !self.white && !game.can_black_castle_long {
+                    return false;
+                }
+                coords_should_be_empty.push(Coord {
+                    x: self.coord.x - 1,
+                    y: self.coord.y,
+                });
+                coords_should_be_empty.push(Coord {
+                    x: self.coord.x - 2,
+                    y: self.coord.y,
+                });
+                coords_should_be_empty.push(Coord {
+                    x: self.coord.x - 3,
+                    y: self.coord.y,
+                });
+            }
+        }
+
+        // 1. Make sure there are empty spaces on the expected tiles.
+        for coord in coords_should_be_empty.iter() {
+            if game.get_piece_at_coord(coord).piece_type != PieceType::None {
+                return false;
+            }
+        }
+
+        // 2. Make sure no enemy pieces are attacking the intermediary square.
+        let intermediary_coord = coords_should_be_empty[0];
+        for row in game.board.iter() {
+            for piece in row.iter() {
+                if
+                    piece.piece_type != PieceType::None
+                    && piece.white != self.white
+                    && piece.is_attacking_coord(&intermediary_coord, game)
+                {
+                    return false;
+                }
+            }
+        }
+
+        // Otherwise, we can castle!
+        return true;
     }
 
     pub fn is_attacking_coord(&self, coord: &Coord, game: &Game) -> bool {
