@@ -166,12 +166,26 @@ impl Piece {
                 }
 
                 if self.can_castle(game, CastleSides::Short) {
-                    // TODO: Store the move instead of printing.
-                    println!("Can castle short");
+                    moves.push(Move {
+                        from: self.coord,
+                        to: Coord {
+                            x: self.coord.x + 2,
+                            y: self.coord.y,
+                        },
+                        is_capture: Some(false),
+                        en_pessant_target_coord: None,
+                    });
                 }
                 if self.can_castle(game, CastleSides::Long) {
-                    // TODO: Store the move instead of printing.
-                    println!("Can castle long");
+                    moves.push(Move {
+                        from: self.coord,
+                        to: Coord {
+                            x: (self.coord.x - 2) as usize,
+                            y: self.coord.y,
+                        },
+                        is_capture: Some(false),
+                        en_pessant_target_coord: None,
+                    });
                 }
             }
             PieceType::Queen => {

@@ -376,6 +376,32 @@ impl Game {
                 self.can_black_castle_short = false;
                 self.can_black_castle_long = false;
             }
+
+            // If the king is moving two squares, we are castling.
+            let x_dist =  (m.from.x as isize - m.to.x as isize).abs();
+            if x_dist == 2 {
+                let castle_direction: CastleSides;
+                if m.to.x > m.from.x {
+                    castle_direction = CastleSides::Short;
+                }
+                else {
+                    castle_direction = CastleSides::Long;
+                }
+
+                // Erase the rook on the starting square.
+                let coord_of_rook_to_erase: Coord = CastleSides::get_rook_start_coord(&castle_direction, self.white_to_move);
+                self.board[coord_of_rook_to_erase.y][coord_of_rook_to_erase.x].piece_type = PieceType::None;
+
+                let rook_offset: i32 = match castle_direction {
+                    CastleSides::Short => { -1 }
+                    CastleSides::Long => { 1 }
+                };
+
+                // Place the rook on the right side of the king.
+                let rook_x_coord = m.to.x as i32 + rook_offset;
+                self.board[m.to.y][rook_x_coord as usize].piece_type = PieceType::Rook;
+                self.board[m.to.y][rook_x_coord as usize].white = piece_to_move.white;
+            }
         }
 
         // If the rook is leaving it's initial square, we can no longer castle that way.
@@ -422,7 +448,7 @@ impl Game {
             && target_square.piece_type == PieceType::None
             && m.is_capture == Some(true)
         {
-            let y_offset_to_clear: usize = if self.white_to_move {m.to.y + 1} else {m.to.y - 1};
+            let y_offset_to_clear: usize = if self.white_to_move { m.to.y + 1 } else { m.to.y - 1 };
             self.board[y_offset_to_clear][m.to.x].piece_type = PieceType::None;
         }
 
