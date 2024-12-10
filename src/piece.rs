@@ -427,8 +427,6 @@ impl Piece {
         for m in moves.iter() {
             if !game.does_move_put_self_in_check(m) {
                 moves_final.push(m.clone());
-            } else {
-                println!("Move {} is illegal. Removing.", m);
             }
         }
 

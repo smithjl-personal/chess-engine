@@ -315,8 +315,6 @@ impl Game {
     }
 
     pub fn does_move_put_self_in_check(&self, m: &Move) -> bool {
-        // println!("Trying to make move, see if we are in check.");
-
         // Make the move on a cloned board, see if it works.
         let mut cloned_game = self.clone();
 
