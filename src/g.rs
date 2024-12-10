@@ -1,6 +1,8 @@
 use std::{array, io, panic};
+use rand::seq::SliceRandom;
 use crate::{
     constants::BOARD_SIZE
+    , constants::INITIAL_GAME_STATE_FEN
     , coord::Coord
     , my_move::Move
     , piece::Piece
@@ -532,16 +534,16 @@ impl Game {
     pub fn play_game_vs_bot(&mut self) {
 
         
-        //self.import_fen(INITIAL_GAME_STATE_FEN);
+        self.import_fen(INITIAL_GAME_STATE_FEN);
         //self.import_fen("rnb1kbnr/pppp1ppp/11111111/1111p111/1111PP1q/111111P1/PPPP111P/RNBQKBNR b");
         //self.import_fen("rnbqkbnr/pppp1ppp/8/4p3/5PP1/8/PPPPP2P/RNBQKBNR b"); // M1 for black.
         //self.import_fen("rnbqkbnr/p1pppppp/8/1p3P2/8/8/PPPPP1PP/RNBQKBNR b KQkq - 0 2"); // Testing for en-passant.
         //self.import_fen("rnbqkbnr/p1pp1ppp/8/1p2pP2/8/8/PPPPP1PP/RNBQKBNR w KQkq e6 0 3"); // Direct capture allowed.
         //self.import_fen("rnbqkbnr/pppppppp/8/8/4B3/4N3/PPPPPPPP/RNBQK2R w KQkq - 0 1"); // Can castle short?
         //self.import_fen("rnbqkbnr/pppppppp/8/8/1QN1B3/2B1N3/PPPPPPPP/R3K2R w KQkq - 0 1"); // Can castle long and short.
-        self.import_fen("rnbqk3/1pppp1P1/7P/5P2/1QN1B3/1PB1N3/pPPPP3/4K2R w Kq - 0 1"); // Pawn promotion.
+        //self.import_fen("rnbqk3/1pppp1P1/7P/5P2/1QN1B3/1PB1N3/pPPPP3/4K2R w Kq - 0 1"); // Pawn promotion.
         self.update_legal_moves();
-        println!("Starting a new game. You are white.");
+        println!("Starting a new game.");
 
         let mut iter_counter: i32 = 0;
         loop {
@@ -614,12 +616,28 @@ impl Game {
             }
 
             // TODO: Let the bot make a move.
+            self.make_move(
+                &self.get_bot_move()
+            );
 
             // Temporary guard for oopsies...
             iter_counter += 1;
             if iter_counter > 1000 {
                 panic!("Dev likely did something wrong, hit 1000 iterations.");
             }
+        }
+    }
+
+    pub fn get_bot_move(&self) -> Move {
+        // Get all legal moves.
+        let moves: Vec<Move> = self.get_all_legal_moves();
+
+        // Pick a random one.
+        let m_option = moves.choose(&mut rand::thread_rng());
+
+        match m_option {
+            Some(m) => return m.clone(),
+            None => panic!("Something has gone very wrong. Tried to get a bot move when none available."),
         }
     }
 }
