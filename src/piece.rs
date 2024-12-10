@@ -1,4 +1,4 @@
-use crate::constants::{BOARD_SIZE, KNIGHT_MOVES};  // Importing the constant
+use crate::constants::{BOARD_SIZE, KNIGHT_MOVES, PAWN_PROMOTION_CHOICES};  // Importing the constant
 use crate::{piece_type::PieceType, coord::Coord, g::Game, my_move::Move, castle_sides::CastleSides};
 
 
@@ -28,6 +28,7 @@ impl Default for Piece {
 }
 
 impl Piece {
+    // Should not be used on pawns, does not account for promotion.
     pub fn generate_moves_in_direction(
         &self, 
         game: &Game, 
@@ -59,6 +60,7 @@ impl Piece {
                     to: to_tile,
                     is_capture: Some(false),
                     en_pessant_target_coord: None,
+                    pawn_promoting_to: None,
                 });
             }
 
@@ -76,6 +78,7 @@ impl Piece {
                     to: to_tile,
                     is_capture: Some(true),
                     en_pessant_target_coord: None,
+                    pawn_promoting_to: None,
                 });
                 break;
             }
@@ -145,6 +148,7 @@ impl Piece {
                                 to: target_piece.coord,
                                 is_capture: Some(false),
                                 en_pessant_target_coord: None,
+                                pawn_promoting_to: None,
                             });
                         }
 
@@ -160,6 +164,7 @@ impl Piece {
                                 to: target_piece.coord,
                                 is_capture: Some(true),
                                 en_pessant_target_coord: None,
+                                pawn_promoting_to: None,
                             });
                         }
                     }
@@ -174,6 +179,7 @@ impl Piece {
                         },
                         is_capture: Some(false),
                         en_pessant_target_coord: None,
+                        pawn_promoting_to: None,
                     });
                 }
                 if self.can_castle(game, CastleSides::Long) {
@@ -185,6 +191,7 @@ impl Piece {
                         },
                         is_capture: Some(false),
                         en_pessant_target_coord: None,
+                        pawn_promoting_to: None,
                     });
                 }
             }
@@ -263,6 +270,7 @@ impl Piece {
                             to: target_square.coord,
                             is_capture: Some(false),
                             en_pessant_target_coord: None,
+                            pawn_promoting_to: None,
                         });
                     }
 
@@ -273,6 +281,7 @@ impl Piece {
                             to: target_square.coord,
                             is_capture: Some(true),
                             en_pessant_target_coord: None,
+                            pawn_promoting_to: None,
                         });
                     }
                 }
@@ -282,32 +291,47 @@ impl Piece {
                 let direction: i32 = if self.white {-1} else {1};
                 let pawn_starting_coord_y: usize = if self.white {6} else {1};
 
-                // We do not need to do any bounds checking for normal moves because of how pawn moves work.
-                // If a pawn makes it to the top/bottom rank, it promotes and is no longer a pawn.
+                
                 let y_pos: i32 = self.coord.y as i32 + direction;
 
-                // This condition should be impossible. But just in case...
+                
+                /*
+                    This condition should be impossible because of how pawn moves work.
+                    If a pawn makes it to the top/bottom rank, it promotes and is no longer a pawn.
+                    But leaving bounds check just in case.
+                 */
                 if y_pos < 0 || y_pos >= BOARD_SIZE as i32 {
                     return moves;
                 }
+
+                // If pawn reaches first/last rank, we can promote.
+                let can_promote: bool;
+                if y_pos == 0 || y_pos == BOARD_SIZE as i32 - 1 {
+                    can_promote = true;
+                } else {
+                    can_promote = false;
+                }
+                
+                let mut temporary_moves: Vec<Move> = vec![];
 
                 // Check moves, not captures here.
                 let target = &game.board[y_pos as usize][self.coord.x];
                 if target.piece_type == PieceType::None {
 
                     // TODO: Handle pawn promotion.
-                    moves.push(Move {
+                    temporary_moves.push(Move {
                         from: self.coord,
                         to: target.coord,
                         is_capture: Some(false),
                         en_pessant_target_coord: None,
+                        pawn_promoting_to: None,
                     });
 
                     // If pawn is on it's starting square, look for double moves.
                     if self.coord.y == pawn_starting_coord_y {
                         let extra_target = &game.board[(y_pos + direction) as usize][self.coord.x];
                         if extra_target.piece_type == PieceType::None {
-                            moves.push(Move {
+                            temporary_moves.push(Move {
                                 from: self.coord,
                                 to: extra_target.coord,
                                 is_capture: Some(false),
@@ -315,6 +339,7 @@ impl Piece {
                                     x: self.coord.x,
                                     y: y_pos as usize,
                                 }),
+                                pawn_promoting_to: None,
                             });
                         }
                     }
@@ -328,22 +353,24 @@ impl Piece {
                     };
 
                     if game.en_passant_target == Some(target_coord) {
-                        moves.push(Move {
+                        temporary_moves.push(Move {
                             from: self.coord,
                             to: target_coord,
                             is_capture: Some(true),
                             en_pessant_target_coord: None, 
+                            pawn_promoting_to: None,
                         });
                     }
 
                     // See if tile is enemy piece.
                     let piece = game.get_piece_at_coord(&target_coord);
                     if piece.piece_type != PieceType::None && piece.white != self.white {
-                        moves.push(Move {
+                        temporary_moves.push(Move {
                             from: self.coord,
                             to: target_coord,
                             is_capture: Some(true),
-                            en_pessant_target_coord: None, 
+                            en_pessant_target_coord: None,
+                            pawn_promoting_to: None,
                         });
                     }
                 }
@@ -356,24 +383,38 @@ impl Piece {
                     };
 
                     if game.en_passant_target == Some(target_coord) {
-                        moves.push(Move {
+                        temporary_moves.push(Move {
                             from: self.coord,
                             to: target_coord,
                             is_capture: Some(true),
-                            en_pessant_target_coord: None, 
+                            en_pessant_target_coord: None,
+                            pawn_promoting_to: None,
                         });
                     }
 
                     // See if tile is enemy piece.
                     let piece = game.get_piece_at_coord(&target_coord);
                     if piece.piece_type != PieceType::None && piece.white != self.white {
-                        moves.push(Move {
+                        temporary_moves.push(Move {
                             from: self.coord,
                             to: target_coord,
                             is_capture: Some(true),
                             en_pessant_target_coord: None,
+                            pawn_promoting_to: None,
                         });
                     }
+                }
+
+                if can_promote {
+                    for m in temporary_moves.iter() {
+                        for t in PAWN_PROMOTION_CHOICES {
+                            let mut copy_move = m.clone();
+                            copy_move.pawn_promoting_to = Some(t);
+                            moves.push(copy_move);
+                        }
+                    }
+                } else {
+                    moves.append(&mut temporary_moves);
                 }
             }
             PieceType::None => {
@@ -381,18 +422,7 @@ impl Piece {
             }
         }
 
-        // TODO: Remove any move that results in us being in check. That would be illegal...
-        /*
-         * Idea for next time.
-         * 1. Add function to `game` that determines if player is in check.
-         * 2. Make a new copy of the game, after that move is made.
-         * 3. See if we are in check!
-         * 
-         * We can also use this method to track if a move is a check or not.
-         */
-
         // Try out every move. See if it's illegal.
-        //println!("Removing illegal moves.");
         let mut moves_final: Vec<Move> = vec![];
         for m in moves.iter() {
             if !game.does_move_put_self_in_check(m) {

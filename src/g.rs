@@ -455,11 +455,16 @@ impl Game {
         // Make the new square the new piece.
         self.board[m.to.y][m.to.x] = piece_to_move;
 
-        // Correct the coordinates, and the moved status.
+        // Correct the coordinates
         self.board[m.to.y][m.to.x].coord = Coord {
             x: m.to.x,
             y: m.to.y,
         };
+
+        // If we are promoting a pawn, update the piece type!
+        if piece_to_move.piece_type == PieceType::Pawn && m.pawn_promoting_to != None {
+            self.board[m.to.y][m.to.x].piece_type = m.pawn_promoting_to.unwrap();
+        }
 
         // Clear out the old square.
         self.board[m.from.y][m.from.x].piece_type = PieceType::None;
@@ -533,7 +538,8 @@ impl Game {
         //self.import_fen("rnbqkbnr/p1pppppp/8/1p3P2/8/8/PPPPP1PP/RNBQKBNR b KQkq - 0 2"); // Testing for en-passant.
         //self.import_fen("rnbqkbnr/p1pp1ppp/8/1p2pP2/8/8/PPPPP1PP/RNBQKBNR w KQkq e6 0 3"); // Direct capture allowed.
         //self.import_fen("rnbqkbnr/pppppppp/8/8/4B3/4N3/PPPPPPPP/RNBQK2R w KQkq - 0 1"); // Can castle short?
-        self.import_fen("rnbqkbnr/pppppppp/8/8/1QN1B3/2B1N3/PPPPPPPP/R3K2R w KQkq - 0 1"); // Can castle long and short.
+        //self.import_fen("rnbqkbnr/pppppppp/8/8/1QN1B3/2B1N3/PPPPPPPP/R3K2R w KQkq - 0 1"); // Can castle long and short.
+        self.import_fen("rnbqk3/1pppp1P1/7P/5P2/1QN1B3/1PB1N3/pPPPP3/4K2R w Kq - 0 1"); // Pawn promotion.
         self.update_legal_moves();
         println!("Starting a new game. You are white.");
 
