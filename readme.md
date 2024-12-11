@@ -1,8 +1,7 @@
 # Developer TODO
 
--   Clean up code, to use consistent positioning of curly braces on `if..else` statements.
+-   Implement alpha-beta pruning, so search depth can be increased.
 -   Import castling rights from FEN.
 -   Run some external tests to verify that the chess game is coded correctly.
--   Add ability to evaluate a board position.
--   Add minimax algorithm to traverse game state tree.
 -   Add some predefined constants for good squares for pieces.
+-   Check for three-fold repetition.

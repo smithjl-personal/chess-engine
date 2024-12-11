@@ -522,6 +522,8 @@ impl Game {
             "Half moves with no capture and pawn move: {}",
             self.half_move_count_non_pawn_non_capture
         );
+
+        println!("Evaluation: {}", self.evaluate_board());
     }
 
     pub fn play_game_vs_bot(&mut self) {
@@ -599,12 +601,13 @@ impl Game {
             }
 
             println!("Made the move...");
+            self.print_debug_game_state();
 
             // See if game is over.
             if self.state != GameState::InProgress {
                 self.print_board();
                 //self.state.print_game_state();
-                self.print_debug_game_state();
+                //self.print_debug_game_state();
                 break;
             }
 
@@ -620,11 +623,63 @@ impl Game {
     }
 
     pub fn get_bot_move(&self) -> Move {
-        // Get all legal moves.
-        let moves: Vec<Move> = self.get_all_legal_moves();
+        if self.legal_moves.len() == 0 {
+            panic!("Something has gone wrong, called get_bot_move when no legal moves were available...");
+        }
 
-        // Pick a random one.
-        let m_option = moves.choose(&mut rand::thread_rng());
+        let mut best_eval: f64;
+        let mut best_move: Move = self.legal_moves[0];
+        if self.white_to_move {
+            best_eval = f64::NEG_INFINITY;
+        } else {
+            best_eval = f64::INFINITY;
+        }
+
+        for legal_move in self.legal_moves.iter() {
+            let mut game_copy = self.clone();
+            game_copy.make_move(legal_move);
+            let minimax_eval = game_copy.minimax(2);
+            if self.white_to_move && minimax_eval > best_eval {
+                best_eval = minimax_eval;
+                best_move = *legal_move;
+            } else if !self.white_to_move && minimax_eval < best_eval {
+                best_eval = minimax_eval;
+                best_move = *legal_move;
+            }
+        }
+
+        return best_move;
+    }
+
+    pub fn minimax(&self, depth: u32) -> f64 {
+        if depth == 0 || self.is_in_checkmate() || self.is_in_stalemate() {
+            return self.evaluate_board();
+        }
+
+        // This code looks terrible...
+        let mut evaluation: f64;
+        if self.white_to_move {
+            evaluation = f64::NEG_INFINITY;
+            for legal_move in self.legal_moves.iter() {
+                let mut game_copy = self.clone();
+                game_copy.make_move(legal_move);
+                evaluation = f64::max(evaluation, game_copy.minimax(depth - 1));
+            }
+        } else {
+            evaluation = f64::INFINITY;
+            for legal_move in self.legal_moves.iter() {
+                let mut game_copy = self.clone();
+                game_copy.make_move(legal_move);
+                evaluation = f64::min(evaluation, game_copy.minimax(depth - 1));
+            }
+        }
+
+        return evaluation;
+    }
+
+    pub fn get_random_bot_move(&self) -> Move {
+        // Pick a random .
+        let m_option = self.legal_moves.choose(&mut rand::thread_rng());
 
         match m_option {
             Some(m) => return m.clone(),
@@ -632,5 +687,31 @@ impl Game {
                 "Something has gone very wrong. Tried to get a bot move when none available."
             ),
         }
+    }
+
+    pub fn evaluate_board(&self) -> f64 {
+        if self.is_in_checkmate() {
+            if self.white_to_move {
+                return f64::NEG_INFINITY;
+            } else {
+                return f64::INFINITY;
+            }
+        }
+
+        if self.is_in_stalemate() {
+            return 0.0;
+        }
+
+        // Look at each piece, track the total eval.
+        let mut evaluation = 0.0;
+        for row in self.board.iter() {
+            for piece in row.iter() {
+                let sign: f64 = if piece.white { 1.0 } else { -1.0 };
+                let val: f64 = piece.piece_type.evaluation_value() * sign;
+                evaluation += val;
+            }
+        }
+
+        return evaluation;
     }
 }
