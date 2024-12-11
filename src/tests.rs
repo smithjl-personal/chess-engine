@@ -1,8 +1,11 @@
-
 // wtf is going on here with 'self'?
-use crate::{constants::BOARD_SIZE, coord::Coord, g::{self}};
+use crate::{
+    constants::BOARD_SIZE,
+    coord::Coord,
+    g::{self},
+};
 
-pub fn run_all_tests(){
+pub fn run_all_tests() {
     // test_bishop_attacks();
     // test_queen_attacks();
     // test_is_in_check();
@@ -22,7 +25,10 @@ pub fn test_bishop_attacks() {
     for str_coord in str_coords_to_check.iter() {
         let target_coord = str_tile_to_coord(&str_coord);
         let attacking = source_piece.is_attacking_coord(&target_coord, &game);
-        println!("Tile {} is attacking {}: {}", source_piece.coord, target_coord, attacking);
+        println!(
+            "Tile {} is attacking {}: {}",
+            source_piece.coord, target_coord, attacking
+        );
     }
 }
 
@@ -38,7 +44,10 @@ pub fn test_queen_attacks() {
     for str_coord in str_coords_to_check.iter() {
         let target_coord = str_tile_to_coord(&str_coord);
         let attacking = source_piece.is_attacking_coord(&target_coord, &game);
-        println!("Tile {} is attacking {}: {}", source_piece.coord, target_coord, attacking);
+        println!(
+            "Tile {} is attacking {}: {}",
+            source_piece.coord, target_coord, attacking
+        );
     }
 }
 
@@ -94,18 +103,24 @@ fn str_tile_to_coord(s: &str) -> Coord {
     let rank_number = s.chars().nth(1).unwrap();
 
     // Attempt conversion for file letter.
-    let x: i32 =  file_letter as i32 - 'a' as i32;
+    let x: i32 = file_letter as i32 - 'a' as i32;
     if x < 0 || x >= BOARD_SIZE as i32 {
         panic!("Invalid file letter: {}", file_letter);
     }
 
-    let y: i32 = BOARD_SIZE as i32 - rank_number.to_digit(10).expect("Cannot convert rank character to a digit.") as i32;
+    let y: i32 = BOARD_SIZE as i32
+        - rank_number
+            .to_digit(10)
+            .expect("Cannot convert rank character to a digit.") as i32;
     if y < 0 || y >= BOARD_SIZE as i32 {
-        panic!("Digit referenced `{}` is outside board size {}.", rank_number, BOARD_SIZE);
+        panic!(
+            "Digit referenced `{}` is outside board size {}.",
+            rank_number, BOARD_SIZE
+        );
     }
 
     return Coord {
         x: x as usize,
         y: y as usize,
-    }
+    };
 }

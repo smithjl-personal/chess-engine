@@ -18,7 +18,10 @@ impl PieceType {
             'b' => Ok(PieceType::Bishop),
             'n' => Ok(PieceType::Knight),
             'p' => Ok(PieceType::Pawn),
-            _ => Err(format!("Unexpected character. Cannot convert character `{}` to piece type.", c)),
+            _ => Err(format!(
+                "Unexpected character. Cannot convert character `{}` to piece type.",
+                c
+            )),
         };
     }
 

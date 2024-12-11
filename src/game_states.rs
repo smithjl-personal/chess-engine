@@ -3,7 +3,7 @@ pub enum GameState {
     InProgress,
     WhiteWins,
     BlackWins,
-    Draw
+    Draw,
 }
 
 impl GameState {

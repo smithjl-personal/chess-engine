@@ -1,15 +1,9 @@
-use std::{array, io, panic};
-use rand::seq::SliceRandom;
 use crate::{
-    constants::BOARD_SIZE
-    , constants::INITIAL_GAME_STATE_FEN
-    , coord::Coord
-    , my_move::Move
-    , piece::Piece
-    , piece_type::PieceType
-    , game_states::GameState
-    , castle_sides::CastleSides
+    castle_sides::CastleSides, constants::BOARD_SIZE, constants::INITIAL_GAME_STATE_FEN,
+    coord::Coord, game_states::GameState, my_move::Move, piece::Piece, piece_type::PieceType,
 };
+use rand::seq::SliceRandom;
+use std::{array, io, panic};
 
 // Struct for the chessboard, which is a 2D array of Pieces
 #[derive(Clone)]
@@ -71,7 +65,7 @@ impl Game {
         println!("    A   B   C   D   E   F   G   H");
     }
 
-    pub fn debug_print_piece_coords(&self){
+    pub fn debug_print_piece_coords(&self) {
         for row in self.board.iter() {
             for piece in row.iter() {
                 print!(" {} ", piece.coord)
@@ -82,45 +76,44 @@ impl Game {
 
     pub fn export_fen(&self) -> String {
         let mut fen = String::new();
-    
+
         for (i, row) in self.board.iter().enumerate() {
             let mut empty_count = 0;
-    
+
             for piece in row.iter() {
                 if piece.piece_type == PieceType::None {
                     empty_count += 1; // Increase the empty square count
-                }
-                else {
+                } else {
                     // Append the count of empty squares if any
                     if empty_count > 0 {
                         fen += &empty_count.to_string();
                         empty_count = 0; // Reset the count after using it
                     }
-    
+
                     // Convert piece type to the FEN character (uppercase for white, lowercase for black)
                     let letter = PieceType::to_char(piece.piece_type, piece.white).to_string();
                     fen += &letter;
                 }
             }
-    
+
             // Append any remaining empty squares at the end of the row
             if empty_count > 0 {
                 fen += &empty_count.to_string();
             }
-    
+
             // Add '/' separator if it's not the last row
             if i < BOARD_SIZE - 1 {
                 fen += "/";
             }
         }
-    
+
         // Add the game status (turn to move)
         if self.white_to_move {
             fen += " w";
         } else {
             fen += " b";
         }
-    
+
         return fen;
     }
 
@@ -139,11 +132,9 @@ impl Game {
 
         // Parse each row of the board.
         for row in rows {
-
             // For each char in the row, we will either have a character or a number.
             let mut x_pos = 0;
             for c in row.chars() {
-
                 // Handles empty spaces on the board.
                 if c.is_digit(10) {
                     let num_empties = c.to_digit(10).expect("Failed to parse digit.") as usize;
@@ -205,7 +196,10 @@ impl Game {
         } else if whose_turn.to_ascii_lowercase() == "b" {
             self.white_to_move = false;
         } else {
-            panic!("Unexpected character for whose turn it is: {}. Should be 'w' or 'b'.", whose_turn);
+            panic!(
+                "Unexpected character for whose turn it is: {}. Should be 'w' or 'b'.",
+                whose_turn
+            );
         }
 
         // Castling.
@@ -213,8 +207,8 @@ impl Game {
         match castling_rights_str {
             Some(_s) => {
                 // TODO: Implement this.
-            },
-            None => { return },
+            }
+            None => return,
         }
 
         // En-Passant target.
@@ -225,12 +219,11 @@ impl Game {
                 let parsed_coord = Coord::str_to_coord(s);
                 if parsed_coord.is_ok() {
                     self.en_passant_target = Some(parsed_coord.unwrap());
-                }
-                else {
+                } else {
                     self.en_passant_target = None;
                 }
-            },
-            None => { return },
+            }
+            None => return,
         }
 
         // Half-Moves since last pawn move and capture (for 50 move rule).
@@ -241,8 +234,8 @@ impl Game {
                 if parsed_number.is_ok() {
                     self.half_move_count_non_pawn_non_capture = parsed_number.unwrap();
                 }
-            },
-            None => { return }
+            }
+            None => return,
         }
 
         // Full move count. Incremented after black moves.
@@ -253,8 +246,8 @@ impl Game {
                 if parsed_number.is_ok() {
                     self.full_move_count = parsed_number.unwrap();
                 }
-            },
-            None => { return }
+            }
+            None => return,
         }
     }
 
@@ -274,7 +267,10 @@ impl Game {
 
     pub fn get_piece_at_coord(&self, coord: &Coord) -> &Piece {
         if coord.x >= BOARD_SIZE || coord.y >= BOARD_SIZE {
-            panic!("Attempted to reference an out of bounds location. x:{} y:{}", coord.x, coord.y);
+            panic!(
+                "Attempted to reference an out of bounds location. x:{} y:{}",
+                coord.x, coord.y
+            );
         }
 
         return &self.board[coord.y][coord.x];
@@ -300,8 +296,7 @@ impl Game {
         // Check all enemy pieces on the board, see if they are attacking our king.
         for row in self.board.iter() {
             for piece in row.iter() {
-                if
-                    piece.piece_type != PieceType::None
+                if piece.piece_type != PieceType::None
                     && piece.white != self.white_to_move
                     && piece.is_attacking_coord(&king_coord.unwrap(), self)
                 {
@@ -349,15 +344,12 @@ impl Game {
         if self.is_in_checkmate() {
             if self.white_to_move {
                 self.state = GameState::BlackWins;
-            }
-            else {
+            } else {
                 self.state = GameState::WhiteWins;
             }
-        }
-        else if self.is_in_stalemate() {
+        } else if self.is_in_stalemate() {
             self.state = GameState::Draw;
-        }
-        else {
+        } else {
             self.state = GameState::InProgress;
         }
     }
@@ -378,23 +370,24 @@ impl Game {
             }
 
             // If the king is moving two squares, we are castling.
-            let x_dist =  (m.from.x as isize - m.to.x as isize).abs();
+            let x_dist = (m.from.x as isize - m.to.x as isize).abs();
             if x_dist == 2 {
                 let castle_direction: CastleSides;
                 if m.to.x > m.from.x {
                     castle_direction = CastleSides::Short;
-                }
-                else {
+                } else {
                     castle_direction = CastleSides::Long;
                 }
 
                 // Erase the rook on the starting square.
-                let coord_of_rook_to_erase: Coord = CastleSides::get_rook_start_coord(&castle_direction, self.white_to_move);
-                self.board[coord_of_rook_to_erase.y][coord_of_rook_to_erase.x].piece_type = PieceType::None;
+                let coord_of_rook_to_erase: Coord =
+                    CastleSides::get_rook_start_coord(&castle_direction, self.white_to_move);
+                self.board[coord_of_rook_to_erase.y][coord_of_rook_to_erase.x].piece_type =
+                    PieceType::None;
 
                 let rook_offset: i32 = match castle_direction {
-                    CastleSides::Short => { -1 }
-                    CastleSides::Long => { 1 }
+                    CastleSides::Short => -1,
+                    CastleSides::Long => 1,
                 };
 
                 // Place the rook on the right side of the king.
@@ -407,31 +400,28 @@ impl Game {
         // If the rook is leaving it's initial square, we can no longer castle that way.
         // TODO: Clean this up. There has to be a better way of storing this.
         if piece_to_move.piece_type == PieceType::Rook {
-            if
-                piece_to_move.white
+            if piece_to_move.white
                 && self.can_white_castle_short
-                && piece_to_move.coord == CastleSides::get_rook_start_coord(&CastleSides::Short, true)
+                && piece_to_move.coord
+                    == CastleSides::get_rook_start_coord(&CastleSides::Short, true)
             {
                 self.can_white_castle_short = false;
-            }
-            else if
-                piece_to_move.white
+            } else if piece_to_move.white
                 && self.can_white_castle_long
-                && piece_to_move.coord == CastleSides::get_rook_start_coord(&CastleSides::Long, true)
+                && piece_to_move.coord
+                    == CastleSides::get_rook_start_coord(&CastleSides::Long, true)
             {
                 self.can_white_castle_long = false;
-            }
-            else if
-                !piece_to_move.white
+            } else if !piece_to_move.white
                 && self.can_black_castle_short
-                && piece_to_move.coord == CastleSides::get_rook_start_coord(&CastleSides::Short, false)
+                && piece_to_move.coord
+                    == CastleSides::get_rook_start_coord(&CastleSides::Short, false)
             {
                 self.can_black_castle_short = false;
-            }
-            else if
-                !piece_to_move.white
+            } else if !piece_to_move.white
                 && self.can_black_castle_long
-                && piece_to_move.coord == CastleSides::get_rook_start_coord(&CastleSides::Long, false)
+                && piece_to_move.coord
+                    == CastleSides::get_rook_start_coord(&CastleSides::Long, false)
             {
                 self.can_black_castle_long = false;
             }
@@ -443,12 +433,15 @@ impl Game {
             Special check for en-passant captures. If we are moving a pawn to an empty square and we are capturing,
             this is an en-passant capture. As such, we need to delete the piece at the en-passant square as well.
         */
-        if
-            piece_to_move.piece_type == PieceType::Pawn
+        if piece_to_move.piece_type == PieceType::Pawn
             && target_square.piece_type == PieceType::None
             && m.is_capture == Some(true)
         {
-            let y_offset_to_clear: usize = if self.white_to_move { m.to.y + 1 } else { m.to.y - 1 };
+            let y_offset_to_clear: usize = if self.white_to_move {
+                m.to.y + 1
+            } else {
+                m.to.y - 1
+            };
             self.board[y_offset_to_clear][m.to.x].piece_type = PieceType::None;
         }
 
@@ -474,8 +467,7 @@ impl Game {
 
         if m.is_capture == Some(true) || piece_to_move.piece_type == PieceType::Pawn {
             self.half_move_count_non_pawn_non_capture = 0;
-        }
-        else {
+        } else {
             self.half_move_count_non_pawn_non_capture += 1;
         }
 
@@ -526,12 +518,13 @@ impl Game {
 
         println!("In check? {}", self.is_in_check());
         println!("Full move count: {}", self.full_move_count);
-        println!("Half moves with no capture and pawn move: {}", self.half_move_count_non_pawn_non_capture);
+        println!(
+            "Half moves with no capture and pawn move: {}",
+            self.half_move_count_non_pawn_non_capture
+        );
     }
 
     pub fn play_game_vs_bot(&mut self) {
-
-        
         self.import_fen(INITIAL_GAME_STATE_FEN);
         //self.import_fen("rnb1kbnr/pppp1ppp/11111111/1111p111/1111PP1q/111111P1/PPPP111P/RNBQKBNR b");
         //self.import_fen("rnbqkbnr/pppp1ppp/8/4p3/5PP1/8/PPPPP2P/RNBQKBNR b"); // M1 for black.
@@ -560,7 +553,9 @@ impl Game {
 
             // Read the user input.
             let mut input = String::new();
-            io::stdin().read_line(&mut input).expect("Failed to readline. Not sure what went wrong.");
+            io::stdin()
+                .read_line(&mut input)
+                .expect("Failed to readline. Not sure what went wrong.");
 
             // Remove endline.
             input = String::from(input.trim());
@@ -614,9 +609,7 @@ impl Game {
             }
 
             // TODO: Let the bot make a move.
-            self.make_move(
-                &self.get_bot_move()
-            );
+            self.make_move(&self.get_bot_move());
 
             // Temporary guard for oopsies...
             iter_counter += 1;
@@ -635,7 +628,9 @@ impl Game {
 
         match m_option {
             Some(m) => return m.clone(),
-            None => panic!("Something has gone very wrong. Tried to get a bot move when none available."),
+            None => panic!(
+                "Something has gone very wrong. Tried to get a bot move when none available."
+            ),
         }
     }
 }

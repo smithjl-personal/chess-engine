@@ -1,6 +1,7 @@
-use crate::constants::{BOARD_SIZE, KNIGHT_MOVES, PAWN_PROMOTION_CHOICES};  // Importing the constant
-use crate::{piece_type::PieceType, coord::Coord, g::Game, my_move::Move, castle_sides::CastleSides};
-
+use crate::constants::{BOARD_SIZE, KNIGHT_MOVES, PAWN_PROMOTION_CHOICES}; // Importing the constant
+use crate::{
+    castle_sides::CastleSides, coord::Coord, g::Game, my_move::Move, piece_type::PieceType,
+};
 
 // Struct for each piece on the board
 #[derive(Copy, Clone, Debug)]
@@ -19,10 +20,7 @@ impl Default for Piece {
             piece_type: PieceType::None,
             white: false,
 
-            coord: Coord {
-                x: 0,
-                y: 0,
-            },
+            coord: Coord { x: 0, y: 0 },
         }
     }
 }
@@ -30,31 +28,34 @@ impl Default for Piece {
 impl Piece {
     // Should not be used on pawns, does not account for promotion.
     pub fn generate_moves_in_direction(
-        &self, 
-        game: &Game, 
-        moves: &mut Vec<Move>, 
-        dx: i32, 
-        dy: i32
+        &self,
+        game: &Game,
+        moves: &mut Vec<Move>,
+        dx: i32,
+        dy: i32,
     ) {
         let mut x = self.coord.x as i32;
         let mut y = self.coord.y as i32;
-    
+
         loop {
             x += dx;
             y += dy;
-    
+
             // Check if the new position is out of bounds.
             if x < 0 || x >= BOARD_SIZE as i32 || y < 0 || y >= BOARD_SIZE as i32 {
                 break;
             }
-    
+
             let x_usize = x as usize;
             let y_usize = y as usize;
 
             // If the tile is free, store it as a valid move.
             if game.board[y_usize][x_usize].piece_type == PieceType::None {
                 let from_tile = self.coord;
-                let to_tile = Coord { x: x_usize, y: y_usize };
+                let to_tile = Coord {
+                    x: x_usize,
+                    y: y_usize,
+                };
                 moves.push(Move {
                     from: from_tile,
                     to: to_tile,
@@ -63,16 +64,17 @@ impl Piece {
                     pawn_promoting_to: None,
                 });
             }
-
             // If the tile contains a friendly piece, stop in that direction.
             else if game.board[y_usize][x_usize].white == self.white {
                 break;
             }
-
             // If the tile contains an enemy piece, store the move and stop.
             else {
                 let from_tile = self.coord;
-                let to_tile = Coord { x: x_usize, y: y_usize };
+                let to_tile = Coord {
+                    x: x_usize,
+                    y: y_usize,
+                };
                 moves.push(Move {
                     from: from_tile,
                     to: to_tile,
@@ -85,7 +87,13 @@ impl Piece {
         }
     }
 
-    pub fn can_attack_coord_in_direction(&self, game: &Game, coord: &Coord, dx: i32, dy: i32) -> bool {
+    pub fn can_attack_coord_in_direction(
+        &self,
+        game: &Game,
+        coord: &Coord,
+        dx: i32,
+        dy: i32,
+    ) -> bool {
         let mut x = self.coord.x as i32;
         let mut y = self.coord.y as i32;
 
@@ -109,18 +117,16 @@ impl Piece {
             if piece.piece_type == PieceType::None {
                 continue;
             }
-
             // We cannot move over our pieces (normally).
             else if piece.white == self.white {
                 return false;
             }
-
             // At this point, we must be on an enemy piece that is not the target square. So we stop here.
             else {
                 return false;
             }
         }
-    } 
+    }
 
     pub fn get_legal_moves(&self, game: &Game) -> Vec<Move> {
         let mut moves: Vec<Move> = vec![];
@@ -137,8 +143,10 @@ impl Piece {
                  * King can move one tile in any direction. `..=` means range inclusive.
                  * This section handles normal parts, not castling.
                  */
-                for y  in (self.coord.y.saturating_sub(1))..=(self.coord.y + 1).min(BOARD_SIZE - 1) {
-                    for x in (self.coord.x.saturating_sub(1))..=(self.coord.x + 1).min(BOARD_SIZE - 1) {
+                for y in (self.coord.y.saturating_sub(1))..=(self.coord.y + 1).min(BOARD_SIZE - 1) {
+                    for x in
+                        (self.coord.x.saturating_sub(1))..=(self.coord.x + 1).min(BOARD_SIZE - 1)
+                    {
                         let target_piece: &Piece = &game.board[y as usize][x as usize];
 
                         // If square is open, we can do the move.
@@ -151,12 +159,10 @@ impl Piece {
                                 pawn_promoting_to: None,
                             });
                         }
-
                         // We cannot move on a piece that is our own color.
                         else if target_piece.white == self.white {
                             continue;
                         }
-
                         // Last case, move must be a capture.
                         else {
                             moves.push(Move {
@@ -247,16 +253,18 @@ impl Piece {
                 self.generate_moves_in_direction(game, &mut moves, 1, 1);
             }
             PieceType::Knight => {
-
                 // For each possible knight move.
-                for (y, x) in KNIGHT_MOVES.iter(){
-
+                for (y, x) in KNIGHT_MOVES.iter() {
                     // Store the offset.
                     let y_pos = y + self.coord.y as i16;
                     let x_pos = x + self.coord.x as i16;
 
                     // Skip if out of bounds.
-                    if x_pos < 0 || x_pos >= BOARD_SIZE as i16 || y_pos < 0 || y_pos >= BOARD_SIZE as i16 {
+                    if x_pos < 0
+                        || x_pos >= BOARD_SIZE as i16
+                        || y_pos < 0
+                        || y_pos >= BOARD_SIZE as i16
+                    {
                         continue;
                     }
 
@@ -273,7 +281,6 @@ impl Piece {
                             pawn_promoting_to: None,
                         });
                     }
-
                     // If square is enemy, track it!
                     else if target_square.white != self.white {
                         moves.push(Move {
@@ -288,18 +295,16 @@ impl Piece {
             }
             PieceType::Pawn => {
                 // White pawns go up the board, black ones go down.
-                let direction: i32 = if self.white {-1} else {1};
-                let pawn_starting_coord_y: usize = if self.white {6} else {1};
+                let direction: i32 = if self.white { -1 } else { 1 };
+                let pawn_starting_coord_y: usize = if self.white { 6 } else { 1 };
 
-                
                 let y_pos: i32 = self.coord.y as i32 + direction;
 
-                
                 /*
-                    This condition should be impossible because of how pawn moves work.
-                    If a pawn makes it to the top/bottom rank, it promotes and is no longer a pawn.
-                    But leaving bounds check just in case.
-                 */
+                   This condition should be impossible because of how pawn moves work.
+                   If a pawn makes it to the top/bottom rank, it promotes and is no longer a pawn.
+                   But leaving bounds check just in case.
+                */
                 if y_pos < 0 || y_pos >= BOARD_SIZE as i32 {
                     return moves;
                 }
@@ -311,13 +316,12 @@ impl Piece {
                 } else {
                     can_promote = false;
                 }
-                
+
                 let mut temporary_moves: Vec<Move> = vec![];
 
                 // Check moves, not captures here.
                 let target = &game.board[y_pos as usize][self.coord.x];
                 if target.piece_type == PieceType::None {
-
                     // TODO: Handle pawn promotion.
                     temporary_moves.push(Move {
                         from: self.coord,
@@ -357,7 +361,7 @@ impl Piece {
                             from: self.coord,
                             to: target_coord,
                             is_capture: Some(true),
-                            en_pessant_target_coord: None, 
+                            en_pessant_target_coord: None,
                             pawn_promoting_to: None,
                         });
                     }
@@ -486,8 +490,7 @@ impl Piece {
         let intermediary_coord = coords_should_be_empty[0];
         for row in game.board.iter() {
             for piece in row.iter() {
-                if
-                    piece.piece_type != PieceType::None
+                if piece.piece_type != PieceType::None
                     && piece.white != self.white
                     && piece.is_attacking_coord(&intermediary_coord, game)
                 {
@@ -517,21 +520,17 @@ impl Piece {
 
                 if coord.x > self.coord.x {
                     dx = 1;
-                }
-                else if coord.x < self.coord.x {
+                } else if coord.x < self.coord.x {
                     dx = -1;
-                }
-                else {
+                } else {
                     dx = 0;
                 }
 
                 if coord.y > self.coord.y {
                     dy = 1;
-                }
-                else if coord.y < self.coord.y {
+                } else if coord.y < self.coord.y {
                     dy = -1;
-                }
-                else {
+                } else {
                     dy = 0;
                 }
 
@@ -546,24 +545,21 @@ impl Piece {
                     dx = 0;
                     if self.coord.y > coord.y {
                         dy = -1;
-                    }
-                    else {
+                    } else {
                         dy = 1;
                     }
-                }
-
-                else if self.coord.y == coord.y {
+                } else if self.coord.y == coord.y {
                     dy = 0;
                     if self.coord.x > coord.x {
                         dx = -1;
-                    }
-                    else {
+                    } else {
                         dx = 1;
                     }
                 }
-
                 // If we don't share the rank or file, we aren't attacking the square.
-                else { return false; }
+                else {
+                    return false;
+                }
 
                 // Try to attack the square.
                 return self.can_attack_coord_in_direction(game, coord, dx, dy);
@@ -574,19 +570,19 @@ impl Piece {
 
                 if coord.x > self.coord.x {
                     dx = 1;
-                }
-                else if coord.x < self.coord.x {
+                } else if coord.x < self.coord.x {
                     dx = -1;
+                } else {
+                    return false;
                 }
-                else { return false }
 
                 if coord.y > self.coord.y {
                     dy = 1;
-                }
-                else if coord.y < self.coord.y {
+                } else if coord.y < self.coord.y {
                     dy = -1;
+                } else {
+                    return false;
                 }
-                else { return false }
 
                 /* Consider finding a way to not check impossible directions. */
                 return self.can_attack_coord_in_direction(game, coord, dx, dy);
@@ -615,9 +611,10 @@ impl Piece {
                 let target_right: isize = self.coord.x as isize + 1;
 
                 return target_left == coord.x as isize || target_right == coord.x as isize;
-                
             }
-            PieceType::None => { return false; }
+            PieceType::None => {
+                return false;
+            }
         }
     }
 }
