@@ -638,7 +638,7 @@ impl Game {
         for legal_move in self.legal_moves.iter() {
             let mut game_copy = self.clone();
             game_copy.make_move(legal_move);
-            let minimax_eval = game_copy.minimax(2);
+            let minimax_eval = game_copy.minimax(2, f64::NEG_INFINITY, f64::INFINITY);
             if self.white_to_move && minimax_eval > best_eval {
                 best_eval = minimax_eval;
                 best_move = *legal_move;
@@ -651,7 +651,7 @@ impl Game {
         return best_move;
     }
 
-    pub fn minimax(&self, depth: u32) -> f64 {
+    pub fn minimax(&self, depth: u32, mut alpha: f64, mut beta: f64) -> f64 {
         if depth == 0 || self.is_in_checkmate() || self.is_in_stalemate() {
             return self.evaluate_board();
         }
@@ -663,14 +663,22 @@ impl Game {
             for legal_move in self.legal_moves.iter() {
                 let mut game_copy = self.clone();
                 game_copy.make_move(legal_move);
-                evaluation = f64::max(evaluation, game_copy.minimax(depth - 1));
+                evaluation = f64::max(evaluation, game_copy.minimax(depth - 1, alpha, beta));
+                if evaluation > beta {
+                    break;
+                }
+                alpha = f64::max(alpha, evaluation);
             }
         } else {
             evaluation = f64::INFINITY;
             for legal_move in self.legal_moves.iter() {
                 let mut game_copy = self.clone();
                 game_copy.make_move(legal_move);
-                evaluation = f64::min(evaluation, game_copy.minimax(depth - 1));
+                evaluation = f64::min(evaluation, game_copy.minimax(depth - 1, alpha, beta));
+                if evaluation < alpha {
+                    break;
+                }
+                beta = f64::min(beta, evaluation);
             }
         }
 
@@ -678,7 +686,6 @@ impl Game {
     }
 
     pub fn get_random_bot_move(&self) -> Move {
-        // Pick a random .
         let m_option = self.legal_moves.choose(&mut rand::thread_rng());
 
         match m_option {
