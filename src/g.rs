@@ -638,7 +638,7 @@ impl Game {
         for legal_move in self.legal_moves.iter() {
             let mut game_copy = self.clone();
             game_copy.make_move(legal_move);
-            let minimax_eval = game_copy.minimax(2, f64::NEG_INFINITY, f64::INFINITY);
+            let minimax_eval = game_copy.minimax(3, f64::NEG_INFINITY, f64::INFINITY);
             if self.white_to_move && minimax_eval > best_eval {
                 best_eval = minimax_eval;
                 best_move = *legal_move;
@@ -715,7 +715,8 @@ impl Game {
             for piece in row.iter() {
                 let sign: f64 = if piece.white { 1.0 } else { -1.0 };
                 let val: f64 = piece.piece_type.evaluation_value() * sign;
-                evaluation += val;
+                let modifier: f64 = piece.piece_type.happy_square_eval_value(piece.coord) * sign;
+                evaluation += val + modifier;
             }
         }
 
