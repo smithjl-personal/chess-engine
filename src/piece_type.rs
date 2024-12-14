@@ -39,7 +39,7 @@ impl PieceType {
                 ];
 
                 return grid[coord.y][coord.x];
-            },
+            }
             Self::Queen => {
                 let grid: [[f64; 8]; 8] = [
                     [-0.05,  0.00,  0.00,  0.00,  0.00,  0.00,  0.00, -0.05,],
@@ -53,7 +53,7 @@ impl PieceType {
                 ];
 
                 return grid[coord.y][coord.x];
-            },
+            }
             Self::Rook => {
                 let grid: [[f64; 8]; 8] = [
                     [-0.05,  0.00,  0.00,  0.00,  0.00,  0.00,  0.00, -0.05,],
@@ -67,7 +67,7 @@ impl PieceType {
                 ];
 
                 return grid[coord.y][coord.x];
-            },
+            }
             Self::Bishop => {
                 let grid: [[f64; 8]; 8] = [
                     [-0.05,  0.00,  0.00,  0.00,  0.00,  0.00,  0.00, -0.05,],
@@ -81,7 +81,7 @@ impl PieceType {
                 ];
 
                 return grid[coord.y][coord.x];
-            },
+            }
             Self::Knight => {
                 let grid: [[f64; 8]; 8] = [
                     [-0.30, -0.20, -0.20, -0.20, -0.20, -0.20, -0.20, -0.30,],
@@ -95,7 +95,7 @@ impl PieceType {
                 ];
 
                 return grid[coord.y][coord.x];
-            },
+            }
             Self::Pawn => {
                 let grid: [[f64; 8]; 8] = [
                     [-0.30, -0.20, -0.20, -0.20, -0.20, -0.20, -0.20, -0.30,],
@@ -109,7 +109,7 @@ impl PieceType {
                 ];
 
                 return grid[coord.y][coord.x];
-            },
+            }
             Self::None => 0.0,
         }
     }

@@ -249,6 +249,8 @@ impl Game {
             }
             None => return,
         }
+
+        self.update_legal_moves();
     }
 
     pub fn get_all_legal_moves(&self) -> Vec<Move> {
@@ -442,6 +444,8 @@ impl Game {
             } else {
                 m.to.y - 1
             };
+
+            // Delete the piece we just captured en-passant.
             self.board[y_offset_to_clear][m.to.x].piece_type = PieceType::None;
         }
 
