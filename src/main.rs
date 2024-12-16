@@ -13,14 +13,14 @@ use core::str;
 // use crate::g::Game;
 // use crate::tests::run_all_tests;
 // use std::error::Error;
-use constants::INITIAL_GAME_STATE_FEN;
+use constants::{INITIAL_GAME_STATE_FEN, LICHESS_CHALLENGER_WHITELIST};
 use my_move::Move;
 use serde_json;
 use std::env;
 
 #[tokio::main]
 async fn main() {
-    play_lichess_game(String::from("AONDtwjfurtG")).await;
+    run_lichess_bot().await;
 }
 
 // TODO: Move these to separate file.
@@ -229,6 +229,132 @@ async fn make_lichess_move(game_id: String, r#move: String) -> Result<(), String
         .await;
 
     let mut response = match response_result {
+        Ok(r) => r,
+        Err(e) => {
+            return Err(e.to_string());
+        }
+    };
+
+    return Ok(());
+}
+
+async fn run_lichess_bot() {
+    let lichess_event_url = "https://lichess.org/api/stream/event";
+    let lichess_auth_token = match env::var("LICHESS_BOT_API_TOKEN") {
+        Ok(s) => s,
+        Err(e) => {
+            println!("Unable to get your bot's API token. Error reading ENV var: `LICHESS_BOT_API_TOKEN`. Make sure it is set!");
+            println!("Raw Error: {}", e);
+            return;
+        }
+    };
+
+    let client: reqwest::Client = reqwest::Client::new();
+    let response_result: Result<reqwest::Response, reqwest::Error> = client
+        .get(lichess_event_url)
+        .bearer_auth(lichess_auth_token)
+        .send()
+        .await;
+
+    let mut response = match response_result {
+        Ok(r) => r,
+        Err(e) => {
+            print!("Error: {}", e);
+            return;
+        }
+    };
+
+    // The API will stream us data.
+    while let Some(chunk) = response.chunk().await.unwrap() {
+        // We just received the '\n' from the API to keep the connection alive. Ignore processing.
+        if chunk.len() == 1 {
+            println!("Activity: None to parse.");
+            continue;
+        }
+
+        // Attempt to convert bytes to string.
+        let full_str = match str::from_utf8(&chunk) {
+            Ok(s) => s,
+            Err(e) => {
+                println!(
+                    "Unable to convert byte array to string (utf8). Error: {}",
+                    e
+                );
+                continue;
+            }
+        };
+
+        println!("Looking at below json:\n{}", full_str);
+
+        // Look through the bytes we got, se expect a few possible items here.
+        if full_str.contains("\"type\":\"challenge\"") {
+            // Attempt to parse accordingly.
+            let lichess_challenge_raw: Result<lichess::Challenge, serde_json::Error> = serde_json::from_str(full_str);
+            let lichess_challenge = match lichess_challenge_raw {
+                Ok(c) => c.challenge,
+                Err(e) => {
+                    println!("Unable to parse lichess challenge. Error: {}", e);
+                    continue;
+                }
+            };
+            println!("We parsed the challenge...\n{:#?}", lichess_challenge);
+
+            // For now, only accept challenges from me.
+            if !LICHESS_CHALLENGER_WHITELIST.contains(&lichess_challenge.challenger.name.as_str()) {
+                println!("Challenger {} is not on the whitelist. Ignoring for now.", lichess_challenge.challenger.name);
+                continue;
+            }
+
+            let _ = accept_lichess_challenge(lichess_challenge.id).await;
+        } else if full_str.contains("\"type\":\"gameStart\"") {
+            println!("Game start event. Not coded to handle this yet.");
+            // Attempt to parse accordingly.
+            let lichess_challenge_start: Result<lichess::ChallengeGameStart, serde_json::Error> = serde_json::from_str(full_str);
+            let lichess_game_full = match lichess_challenge_start {
+                Ok(c) => c.game,
+                Err(e) => {
+                    println!("Unable to parse lichess challenge. Error: {}", e);
+                    continue;
+                }
+            };
+            println!("We parsed this incoming game, handing off to game handler...\n{:#?}", lichess_game_full);
+            let _ = play_lichess_game(lichess_game_full.id).await;
+            continue;
+        } else if full_str.contains("\"type\":\"gameFinish\"") {
+            println!("Game finish event. Not coded to handle this yet.");
+            continue;
+        } else if full_str.contains("\"type\":\"challengeCanceled\"") {
+            println!("Challenge cancelled event. Not coded to handle this yet.");
+            continue;
+        } else if full_str.contains("\"type\":\"challengeDeclined\"") {
+            println!("Challenge declined event. Not coded to handle this yet.");
+            continue;
+        } else {
+            println!("Unexpected event type. See what went wrong.\n{}", full_str);
+            continue;
+        }
+    }
+}
+
+async fn accept_lichess_challenge(game_id: String) -> Result<(), String> {
+    println!("Accept lichess challenge called!");
+    let lichess_url = format!("https://lichess.org/api/challenge/{game_id}/accept");
+    let lichess_auth_token = match env::var("LICHESS_BOT_API_TOKEN") {
+        Ok(s) => s,
+        Err(e) => {
+            return Err(e.to_string());
+        }
+    };
+
+    let client: reqwest::Client = reqwest::Client::new();
+    let response_result: Result<reqwest::Response, reqwest::Error> = client
+        .post(lichess_url)
+        .bearer_auth(lichess_auth_token)
+        .send()
+        .await;
+
+    println!("api respond to making challenge... {:#?}", response_result);
+    let _ = match response_result {
         Ok(r) => r,
         Err(e) => {
             return Err(e.to_string());

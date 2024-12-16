@@ -98,3 +98,47 @@ impl Default for GameFull {
         }
     }
 }
+
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Challenge {
+    pub r#type: String,
+    pub challenge: InnerChallenge
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct InnerChallenge {
+    pub id: String,
+    pub url: String,
+    pub status: String,
+
+    // There are actually a couple other fields here, but we don't care about them.
+    pub challenger: UserBasic,
+
+    // Lichess API gives us CAMEL CASE. So we fix it.
+    #[serde(rename = "destUser")]
+    pub dest_user: UserBasic,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ChallengeGameStart {
+    pub r#type: String,
+    pub game: InnerChallengeGameStart,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct InnerChallengeGameStart {
+    pub id: String,
+    pub color: String,
+    pub fen: String,
+    pub source: String,
+
+    #[serde(rename = "hasMoved")]
+    pub has_moved: bool,
+
+    #[serde(rename = "isMyTurn")]
+    pub is_my_turn: bool,
+
+    #[serde(rename = "lastMove")]
+    pub last_move: String,
+}
