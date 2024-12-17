@@ -205,8 +205,23 @@ impl Game {
         // Castling.
         let castling_rights_str = parts.next();
         match castling_rights_str {
-            Some(_s) => {
-                // TODO: Implement this.
+            Some(s) => {
+                // Assume no one can castle.
+                self.can_white_castle_long = false;
+                self.can_white_castle_short = false;
+                self.can_black_castle_long = false;
+                self.can_black_castle_short = false;
+
+                // Update rights based on what we find in the string.
+                for c in s.chars() {
+                    match c {
+                        'K' => self.can_white_castle_short = true,
+                        'Q' => self.can_white_castle_long = true,
+                        'k' => self.can_black_castle_short = true,
+                        'q' => self.can_black_castle_long = true,
+                        _ => (),
+                    }
+                }
             }
             None => return,
         }
