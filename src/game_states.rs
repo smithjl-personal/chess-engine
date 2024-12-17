@@ -7,12 +7,15 @@ pub enum GameState {
 }
 
 impl GameState {
-    pub fn print_game_state(&self) {
+    pub fn get_game_state_str(&self) -> &str {
         match self {
-            Self::InProgress => println!("Game is still in progress."),
-            Self::WhiteWins => println!("White wins!"),
-            Self::BlackWins => println!("Black wins!"),
-            Self::Draw => println!("Game is drawn!"),
+            Self::InProgress => "Game is still in progress.",
+            Self::WhiteWins => "White wins!",
+            Self::BlackWins => "Black wins!",
+            Self::Draw => "Game is drawn!",
         }
+    }
+    pub fn print_game_state(&self) {
+        println!("{}", self.get_game_state_str());
     }
 }

@@ -17,6 +17,7 @@ use constants::{INITIAL_GAME_STATE_FEN, LICHESS_CHALLENGER_WHITELIST};
 use my_move::Move;
 use serde_json;
 use std::env;
+use std::collections::HashMap;
 
 #[tokio::main]
 async fn main() {
@@ -82,7 +83,26 @@ async fn play_lichess_game(game_id: String) {
             println!("Opponent left. Code not set up to handle this.");
             continue;
         } else if full_str.contains("\"type\":\"chatLine\"") {
-            println!("Opponent talked in chat. Code not set up to handle this.");
+            let lichess_chat_line_parse_attempt: Result<lichess::ChatLineEvent, serde_json::Error> =
+                serde_json::from_str(full_str);
+            let chat_event: lichess::ChatLineEvent = match lichess_chat_line_parse_attempt {
+                Ok(g) => g,
+                Err(e) => {
+                    println!("Unable to parse lichess chat line. Error: {}", e);
+                    continue;
+                }
+            };
+
+            println!("We parsed this chat line event: {:#?}", chat_event);
+
+            if chat_event.text == "debug" {
+                
+                println!("{}", game.get_debug_game_state_str());
+                let _ = write_lichess_chat_message(
+                    lichess_game.id.to_string(), 
+                    "Message recieved. Check the console.".to_string()
+                ).await;
+            }
             continue;
         } else if full_str.contains("\"type\":\"gameFull\"") {
             println!("Game full event read. Will parse this soon.");
@@ -207,8 +227,6 @@ async fn play_lichess_game(game_id: String) {
             );
             break;
         }
-
-        //println!("Chunk: {chunk:?}, Length: {}", chunk.len());
     }
 }
 
@@ -337,7 +355,6 @@ async fn run_lichess_bot() {
 }
 
 async fn accept_lichess_challenge(game_id: String) -> Result<(), String> {
-    println!("Accept lichess challenge called!");
     let lichess_url = format!("https://lichess.org/api/challenge/{game_id}/accept");
     let lichess_auth_token = match env::var("LICHESS_BOT_API_TOKEN") {
         Ok(s) => s,
@@ -353,13 +370,46 @@ async fn accept_lichess_challenge(game_id: String) -> Result<(), String> {
         .send()
         .await;
 
-    println!("api respond to making challenge... {:#?}", response_result);
     let _ = match response_result {
         Ok(r) => r,
         Err(e) => {
             return Err(e.to_string());
         }
     };
+
+    return Ok(());
+}
+
+async fn write_lichess_chat_message(game_id: String, message: String) -> Result<(), String> {
+    let lichess_url = format!("https://lichess.org/api/bot/game/{game_id}/chat");
+    let lichess_auth_token = match env::var("LICHESS_BOT_API_TOKEN") {
+        Ok(s) => s,
+        Err(e) => {
+            return Err(e.to_string());
+        }
+    };
+
+    let mut params = HashMap::new();
+    params.insert("room", "player"); // player/spectator
+    params.insert("text", &message);
+
+    let client: reqwest::Client = reqwest::Client::new();
+    let response_result: Result<reqwest::Response, reqwest::Error> = client
+        .post(lichess_url)
+        .bearer_auth(lichess_auth_token)
+        .form(&params)
+        .send()
+        .await;
+
+    println!("api respond to making message... {:#?}", response_result);
+    let parsed = match response_result {
+        Ok(r) => r,
+        Err(e) => {
+            return Err(e.to_string());
+        }
+    };
+
+    println!("text: {:#?}", parsed.text().await);
 
     return Ok(());
 }

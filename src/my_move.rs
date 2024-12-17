@@ -11,6 +11,14 @@ pub struct Move {
 }
 
 impl Move {
+    pub fn move_to_str(&self) -> String {
+        let extra_char: String = match self.pawn_promoting_to {
+            Some(t) => PieceType::to_char(t, false).to_string(),
+            None => String::from(""),
+        };
+        return format!("{}{}{}", self.from, self.to, extra_char);
+    }
+
     pub fn str_to_move(text: &str) -> Result<Move, String> {
         if text.len() != 4 && text.len() != 5 {
             return Err(format!(

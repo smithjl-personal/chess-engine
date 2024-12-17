@@ -503,31 +503,63 @@ impl Game {
         println!();
     }
 
-    pub fn print_debug_game_state(&self) {
-        print!("Game state: ");
-        self.state.print_game_state();
+    pub fn get_debug_game_state_str(&self) -> String {
+        let mut state_str = String::new();
+        let mut formatted = String::new();
 
+        // Game state.
+        formatted = format!("Game state: {}\n", self.state.get_game_state_str());
+        state_str += formatted.as_str();
+
+        // Whose turn is it.
         if self.white_to_move {
-            print!("It is white to move.");
+            state_str += "It is white to move.\n";
         } else {
-            print!("It is black to move.");
+            state_str += "It is black to move.\n";
         }
 
-        println!(" And they have {} legal moves.", self.legal_moves.len());
-        print!("En-Passant target square: ");
+        // Legal moves.
+        state_str += format!("They have {} legal moves.\n", self.legal_moves.len()).as_str();
+        for m in self.legal_moves.iter() {
+            formatted = format!("{} ", m.move_to_str());
+            state_str += formatted.as_str();
+        }
+        state_str += "\n";
+
+        // En-Passant.
+        state_str += "En-Passant target square: ";
         match self.en_passant_target {
-            Some(t) => println!("{}", t),
-            None => println!("None"),
+            Some(t) => {
+                formatted = format!("{}\n", t);
+                state_str += formatted.as_str();
+            },
+            None => state_str += "None.\n",
         }
 
-        println!("In check? {}", self.is_in_check());
-        println!("Full move count: {}", self.full_move_count);
-        println!(
-            "Half moves with no capture and pawn move: {}",
+        // Other generic stuff.
+        formatted = format!("In check? {}\n", self.is_in_check());
+        state_str += formatted.as_str();
+
+        formatted = format!("Full move count: {}\n", self.full_move_count);
+        state_str += formatted.as_str();
+
+        formatted = format!(
+            "Half moves with no capture and pawn move: {}\n",
             self.half_move_count_non_pawn_non_capture
         );
+        state_str += formatted.as_str();
 
-        println!("Evaluation: {}", self.evaluate_board());
+        formatted = format!("Evaluation: {}\n", self.evaluate_board());
+        state_str += formatted.as_str();
+
+        state_str += "Our FEN:\n";
+        state_str += self.export_fen().as_str();
+
+        return state_str;
+    }
+
+    pub fn print_debug_game_state(&self) {
+        println!("{}", self.get_debug_game_state_str());
     }
 
     pub fn play_game_vs_bot(&mut self) {

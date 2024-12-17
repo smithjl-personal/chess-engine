@@ -142,3 +142,11 @@ pub struct InnerChallengeGameStart {
     #[serde(rename = "lastMove")]
     pub last_move: String,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ChatLineEvent {
+    pub r#type: String,
+    pub username: String,
+    pub text: String,
+    pub room: String,
+}
