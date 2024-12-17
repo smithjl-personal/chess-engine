@@ -751,7 +751,7 @@ impl Game {
             for piece in row.iter() {
                 let sign: f64 = if piece.white { 1.0 } else { -1.0 };
                 let val: f64 = piece.piece_type.evaluation_value() * sign;
-                let modifier: f64 = piece.piece_type.happy_square_eval_value(piece.coord) * sign;
+                let modifier: f64 = piece.piece_type.happy_square_eval_value(piece.coord, piece.white) * sign;
                 evaluation += val + modifier;
             }
         }
