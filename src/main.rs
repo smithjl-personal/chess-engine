@@ -150,7 +150,7 @@ async fn play_lichess_game(game_id: String) {
                 }
 
                 match user_move {
-                    Some(m) => game.make_move(&m),
+                    Some(m) => game.make_move_and_update_state(&m),
                     None => {
                         println!("Tried to make 'illegal' move...");
                         //self.print_all_legal_moves();
@@ -160,7 +160,7 @@ async fn play_lichess_game(game_id: String) {
 
                 //let internal_move
 
-                //game.make_move(&m, Some(true));
+                //game.make_move_and_update_state(&m, Some(true));
                 // println!("{}", game.export_fen());
             }
             // println!("Stopping due to testing.");
@@ -190,9 +190,11 @@ async fn play_lichess_game(game_id: String) {
 
             lichess_game.state = lichess_game_state;
 
+            // TODO: Check for resignation?
+
             // Handle errors later...
             let last_move = Move::str_to_move(&last_move_str);
-            game.make_move(&last_move.unwrap());
+            game.make_move_and_update_state(&last_move.unwrap());
 
             // Print our evaluation after each move.
             println!("Our evaluation of the position: {}", game.evaluate_board());
@@ -335,6 +337,8 @@ async fn run_lichess_bot() {
                     continue;
                 }
             };
+
+            // TODO: Maybe run the game in another thread???
             println!("We parsed this incoming game, handing off to game handler...\n{:#?}", lichess_game_full);
             let _ = play_lichess_game(lichess_game_full.id).await;
             continue;

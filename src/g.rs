@@ -280,7 +280,10 @@ impl Game {
         }
 
         legal_moves.sort_unstable_by_key(|m| {
-            // TODO: Look at checks first.
+            // Look at checks.
+            if m.is_check == Some(true) {
+                return 1;
+            }
 
             // Look at captures.
             if m.is_capture == Some(true) {
@@ -509,11 +512,13 @@ impl Game {
 
         // Make it the other player's turn.
         self.white_to_move = !self.white_to_move;
+    }
+
+    pub fn make_move_and_update_state(&mut self, m: &Move) {
+        self.make_move(m);
 
         // Update legal moves in the position.
         self.update_legal_moves();
-
-        // TODO: Run this? Causes stack overflows right now...
         self.update_game_state();
     }
 
@@ -655,7 +660,7 @@ impl Game {
             }
 
             match user_move {
-                Some(m) => self.make_move(&m),
+                Some(m) => self.make_move_and_update_state(&m),
                 None => {
                     println!("That is not one of your legal moves. Try again.");
                     self.print_all_legal_moves();
@@ -675,7 +680,7 @@ impl Game {
             }
 
             // TODO: Let the bot make a move.
-            self.make_move(&self.get_bot_move());
+            self.make_move_and_update_state(&self.get_bot_move());
 
             // Temporary guard for oopsies...
             iter_counter += 1;
@@ -700,7 +705,7 @@ impl Game {
 
         for legal_move in self.legal_moves.iter() {
             let mut game_copy = self.clone();
-            game_copy.make_move(legal_move);
+            game_copy.make_move_and_update_state(legal_move);
             let minimax_eval = game_copy.minimax(3, f64::NEG_INFINITY, f64::INFINITY);
             if self.white_to_move && minimax_eval > best_eval {
                 best_eval = minimax_eval;
@@ -725,7 +730,7 @@ impl Game {
             evaluation = f64::NEG_INFINITY;
             for legal_move in self.legal_moves.iter() {
                 let mut game_copy = self.clone();
-                game_copy.make_move(legal_move);
+                game_copy.make_move_and_update_state(legal_move);
                 evaluation = f64::max(evaluation, game_copy.minimax(depth - 1, alpha, beta));
                 if evaluation > beta {
                     break;
@@ -736,7 +741,7 @@ impl Game {
             evaluation = f64::INFINITY;
             for legal_move in self.legal_moves.iter() {
                 let mut game_copy = self.clone();
-                game_copy.make_move(legal_move);
+                game_copy.make_move_and_update_state(legal_move);
                 evaluation = f64::min(evaluation, game_copy.minimax(depth - 1, alpha, beta));
                 if evaluation < alpha {
                     break;

@@ -5,6 +5,7 @@ pub struct Move {
     pub from: Coord,
     pub to: Coord,
     pub is_capture: Option<bool>,
+    pub is_check: Option<bool>,
 
     pub en_pessant_target_coord: Option<Coord>, // Does this need to be part of this?
     pub pawn_promoting_to: Option<PieceType>,
@@ -57,6 +58,7 @@ impl Move {
 
             // We don't know this data without the board.
             is_capture: None,
+            is_check: None,
             en_pessant_target_coord: None,
         };
 

@@ -60,6 +60,7 @@ impl Piece {
                     from: from_tile,
                     to: to_tile,
                     is_capture: Some(false),
+                    is_check: None,
                     en_pessant_target_coord: None,
                     pawn_promoting_to: None,
                 });
@@ -79,6 +80,7 @@ impl Piece {
                     from: from_tile,
                     to: to_tile,
                     is_capture: Some(true),
+                    is_check: None,
                     en_pessant_target_coord: None,
                     pawn_promoting_to: None,
                 });
@@ -155,6 +157,7 @@ impl Piece {
                                 from: self.coord,
                                 to: target_piece.coord,
                                 is_capture: Some(false),
+                                is_check: None,
                                 en_pessant_target_coord: None,
                                 pawn_promoting_to: None,
                             });
@@ -169,6 +172,7 @@ impl Piece {
                                 from: self.coord,
                                 to: target_piece.coord,
                                 is_capture: Some(true),
+                                is_check: None,
                                 en_pessant_target_coord: None,
                                 pawn_promoting_to: None,
                             });
@@ -184,6 +188,7 @@ impl Piece {
                             y: self.coord.y,
                         },
                         is_capture: Some(false),
+                        is_check: None,
                         en_pessant_target_coord: None,
                         pawn_promoting_to: None,
                     });
@@ -196,6 +201,7 @@ impl Piece {
                             y: self.coord.y,
                         },
                         is_capture: Some(false),
+                        is_check: None,
                         en_pessant_target_coord: None,
                         pawn_promoting_to: None,
                     });
@@ -277,6 +283,7 @@ impl Piece {
                             from: self.coord,
                             to: target_square.coord,
                             is_capture: Some(false),
+                            is_check: None,
                             en_pessant_target_coord: None,
                             pawn_promoting_to: None,
                         });
@@ -287,6 +294,7 @@ impl Piece {
                             from: self.coord,
                             to: target_square.coord,
                             is_capture: Some(true),
+                            is_check: None,
                             en_pessant_target_coord: None,
                             pawn_promoting_to: None,
                         });
@@ -327,6 +335,7 @@ impl Piece {
                         from: self.coord,
                         to: target.coord,
                         is_capture: Some(false),
+                        is_check: None,
                         en_pessant_target_coord: None,
                         pawn_promoting_to: None,
                     });
@@ -339,6 +348,7 @@ impl Piece {
                                 from: self.coord,
                                 to: extra_target.coord,
                                 is_capture: Some(false),
+                                is_check: None,
                                 en_pessant_target_coord: Some(Coord {
                                     x: self.coord.x,
                                     y: y_pos as usize,
@@ -361,6 +371,7 @@ impl Piece {
                             from: self.coord,
                             to: target_coord,
                             is_capture: Some(true),
+                            is_check: None,
                             en_pessant_target_coord: None,
                             pawn_promoting_to: None,
                         });
@@ -373,6 +384,7 @@ impl Piece {
                             from: self.coord,
                             to: target_coord,
                             is_capture: Some(true),
+                            is_check: None,
                             en_pessant_target_coord: None,
                             pawn_promoting_to: None,
                         });
@@ -391,6 +403,7 @@ impl Piece {
                             from: self.coord,
                             to: target_coord,
                             is_capture: Some(true),
+                            is_check: None,
                             en_pessant_target_coord: None,
                             pawn_promoting_to: None,
                         });
@@ -403,6 +416,7 @@ impl Piece {
                             from: self.coord,
                             to: target_coord,
                             is_capture: Some(true),
+                            is_check: None,
                             en_pessant_target_coord: None,
                             pawn_promoting_to: None,
                         });
@@ -428,10 +442,23 @@ impl Piece {
 
         // Try out every move. See if it's illegal.
         let mut moves_final: Vec<Move> = vec![];
-        for m in moves.iter() {
-            if !game.does_move_put_self_in_check(m) {
-                moves_final.push(m.clone());
+        for m in moves.iter_mut() {
+
+            // Don't add illegal moves.
+            if game.does_move_put_self_in_check(m) {
+                continue;
             }
+
+            // See if the move is a check (for sorting purposes.) This is likely bad for performance? But alpha-beta may be faster this way...
+            let mut game_copy = game.clone();
+            game_copy.make_move(&m);
+            if game_copy.is_in_check() {
+                m.is_check = Some(true);
+            } else {
+                m.is_check = Some(false);
+            }
+
+            moves_final.push(*m);
         }
 
         return moves_final;
