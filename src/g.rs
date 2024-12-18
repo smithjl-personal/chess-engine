@@ -279,6 +279,18 @@ impl Game {
             }
         }
 
+        legal_moves.sort_unstable_by_key(|m| {
+            // TODO: Look at checks first.
+
+            // Look at captures.
+            if m.is_capture == Some(true) {
+                return 2;
+            }
+
+            // Default value of move.
+            return 3;
+        });
+
         return legal_moves;
     }
 
