@@ -18,4 +18,5 @@ pub const PAWN_PROMOTION_CHOICES: [PieceType; 4] = [
     PieceType::Knight,
     PieceType::Bishop,
 ];
+pub const LICHESS_BOT_USERNAME: &str = "botmasterj";
 pub const LICHESS_CHALLENGER_WHITELIST: [&str; 1] = ["The_Big_C"];
