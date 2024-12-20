@@ -3,7 +3,7 @@ pub mod constants;
 pub mod coord;
 pub mod g; // Something is wrong with rust-analyzer. This is the only way it will pick up the changes right now.
 pub mod game_states;
-pub mod lichess;
+pub mod lichess_structs;
 pub mod my_move;
 pub mod piece;
 pub mod piece_type;
@@ -18,6 +18,7 @@ use my_move::Move;
 use serde_json;
 use std::env;
 use std::collections::HashMap;
+//use std::thread;
 
 #[tokio::main]
 async fn main() {
@@ -54,13 +55,13 @@ async fn play_lichess_game(game_id: String) {
     //println!("Raw Response: {:#?}", response);
 
     // This function will run forever, when calling a streamed API.
-    let mut lichess_game: lichess::GameFull = lichess::GameFull::default();
+    let mut lichess_game: lichess_structs::GameFull = lichess_structs::GameFull::default();
     let mut game = g::Game::default();
     let mut is_bot_white: bool = true;
     while let Some(chunk) = response.chunk().await.unwrap() {
         // We just received the '\n' from the API to keep the connection alive. Ignore processing.
         if chunk.len() == 1 {
-            println!("Waiting for new data...");
+            println!("Play Game Thread: Waiting for new data...");
             continue;
         }
 
@@ -83,9 +84,9 @@ async fn play_lichess_game(game_id: String) {
             println!("Opponent left. Code not set up to handle this.");
             continue;
         } else if full_str.contains("\"type\":\"chatLine\"") {
-            let lichess_chat_line_parse_attempt: Result<lichess::ChatLineEvent, serde_json::Error> =
+            let lichess_chat_line_parse_attempt: Result<lichess_structs::ChatLineEvent, serde_json::Error> =
                 serde_json::from_str(full_str);
-            let chat_event: lichess::ChatLineEvent = match lichess_chat_line_parse_attempt {
+            let chat_event: lichess_structs::ChatLineEvent = match lichess_chat_line_parse_attempt {
                 Ok(g) => g,
                 Err(e) => {
                     println!("Unable to parse lichess chat line. Error: {}", e);
@@ -106,7 +107,7 @@ async fn play_lichess_game(game_id: String) {
             continue;
         } else if full_str.contains("\"type\":\"gameFull\"") {
             println!("Game full event read. Will parse this soon.");
-            let lichess_game_parse_attempt: Result<lichess::GameFull, serde_json::Error> =
+            let lichess_game_parse_attempt: Result<lichess_structs::GameFull, serde_json::Error> =
                 serde_json::from_str(full_str);
             lichess_game = match lichess_game_parse_attempt {
                 Ok(g) => g,
@@ -168,7 +169,7 @@ async fn play_lichess_game(game_id: String) {
 
             // Let the rest below handle the rest. Game state is now set.
         } else if full_str.contains("\"type\":\"gameState\"") {
-            let lichess_game_state_parse_attempt: Result<lichess::GameState, serde_json::Error> =
+            let lichess_game_state_parse_attempt: Result<lichess_structs::GameState, serde_json::Error> =
                 serde_json::from_str(full_str);
             let lichess_game_state = match lichess_game_state_parse_attempt {
                 Ok(g) => g,
@@ -288,7 +289,7 @@ async fn run_lichess_bot() {
     while let Some(chunk) = response.chunk().await.unwrap() {
         // We just received the '\n' from the API to keep the connection alive. Ignore processing.
         if chunk.len() == 1 {
-            println!("Activity: None to parse.");
+            println!("Main Thread Activity: None to parse.");
             continue;
         }
 
@@ -309,7 +310,7 @@ async fn run_lichess_bot() {
         // Look through the bytes we got, se expect a few possible items here.
         if full_str.contains("\"type\":\"challenge\"") {
             // Attempt to parse accordingly.
-            let lichess_challenge_raw: Result<lichess::Challenge, serde_json::Error> = serde_json::from_str(full_str);
+            let lichess_challenge_raw: Result<lichess_structs::Challenge, serde_json::Error> = serde_json::from_str(full_str);
             let lichess_challenge = match lichess_challenge_raw {
                 Ok(c) => c.challenge,
                 Err(e) => {
@@ -329,7 +330,7 @@ async fn run_lichess_bot() {
         } else if full_str.contains("\"type\":\"gameStart\"") {
             println!("Game start event. Not coded to handle this yet.");
             // Attempt to parse accordingly.
-            let lichess_challenge_start: Result<lichess::ChallengeGameStart, serde_json::Error> = serde_json::from_str(full_str);
+            let lichess_challenge_start: Result<lichess_structs::ChallengeGameStart, serde_json::Error> = serde_json::from_str(full_str);
             let lichess_game_full = match lichess_challenge_start {
                 Ok(c) => c.game,
                 Err(e) => {
@@ -340,7 +341,10 @@ async fn run_lichess_bot() {
 
             // TODO: Maybe run the game in another thread???
             println!("We parsed this incoming game, handing off to game handler...\n{:#?}", lichess_game_full);
-            let _ = play_lichess_game(lichess_game_full.id).await;
+            // thread::spawn(|| async move {
+                //println!("Spawning thread...");
+                //let _ = play_lichess_game(lichess_game_full.id).await;
+            // });
             continue;
         } else if full_str.contains("\"type\":\"gameFinish\"") {
             println!("Game finish event. Not coded to handle this yet.");
