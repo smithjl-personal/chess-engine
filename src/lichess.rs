@@ -77,12 +77,11 @@ async fn play_game(token: &str, game_id: &str, fen: &str) {
                 let _ = write_chat_message(
                     token,
                     &lichess_game.id, 
-                    "Message recieved. Check the console.".to_string()
+                    "Message recieved. Check the console."
                 ).await;
             }
             continue;
         } else if full_str.contains("\"type\":\"gameFull\"") {
-            println!("Game full event read. Will parse this soon.");
             let lichess_game_parse_attempt: Result<lichess_structs::GameFull, serde_json::Error> =
                 serde_json::from_str(full_str);
             lichess_game = match lichess_game_parse_attempt {
@@ -141,7 +140,7 @@ async fn play_game(token: &str, game_id: &str, fen: &str) {
 
         // If we reach this point, see if it's our turn.
         if game.white_to_move != is_bot_white {
-            println!("It is the opponents turn. Waiting.");
+            println!("It is the opponents turn. Waiting for our turn.");
             continue;
         }
 
@@ -215,7 +214,7 @@ async fn run(token: &str) {
     while let Some(chunk) = response.chunk().await.unwrap() {
         // We just received the '\n' from the API to keep the connection alive. Ignore processing.
         if chunk.len() == 1 {
-            println!("Main Thread Activity: None to parse.");
+            println!("Main Thread: Waiting for new data...");
             continue;
         }
 
@@ -295,21 +294,25 @@ async fn accept_challenge(token: &str, game_id: &str) -> Result<(), String> {
         .send()
         .await;
 
-    let _ = match response_result {
+    let parsed_response = match response_result {
         Ok(r) => r,
         Err(e) => {
             return Err(e.to_string());
         }
     };
 
+    if parsed_response.status() != 200 {
+        return Err(format!("Something went wrong trying to accept challenge.\nAPI response: {:#?}.", parsed_response.text().await));
+    }
+
     return Ok(());
 }
 
-async fn write_chat_message(token: &str, game_id: &str, message: String) -> Result<(), String> {
+async fn write_chat_message(token: &str, game_id: &str, message: &str) -> Result<(), String> {
     let lichess_url = format!("https://lichess.org/api/bot/game/{game_id}/chat");
     let mut params = HashMap::new();
     params.insert("room", "player"); // player/spectator
-    params.insert("text", &message);
+    params.insert("text", message);
 
     let client: reqwest::Client = reqwest::Client::new();
     let response_result: Result<reqwest::Response, reqwest::Error> = client
@@ -319,15 +322,16 @@ async fn write_chat_message(token: &str, game_id: &str, message: String) -> Resu
         .send()
         .await;
 
-    println!("api respond to making message... {:#?}", response_result);
-    let parsed = match response_result {
+    let parsed_response = match response_result {
         Ok(r) => r,
         Err(e) => {
             return Err(e.to_string());
         }
     };
 
-    println!("text: {:#?}", parsed.text().await);
+    if parsed_response.status() != 200 {
+        return Err(format!("Something went wrong trying to write chat message.\nAPI response: {:#?}.", parsed_response.text().await));
+    }
 
     return Ok(());
 }
