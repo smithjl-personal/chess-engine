@@ -537,7 +537,7 @@ impl Game {
 
     pub fn get_debug_game_state_str(&self) -> String {
         let mut state_str = String::new();
-        let mut formatted = String::new();
+        let mut formatted;
 
         // Game state.
         formatted = format!("Game state: {}\n", self.state.get_game_state_str());

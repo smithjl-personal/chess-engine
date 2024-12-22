@@ -12,5 +12,5 @@ pub mod lichess;
 
 #[tokio::main]
 async fn main() {
-    lichess::main().await;
+    let _ = lichess::main().await;
 }
