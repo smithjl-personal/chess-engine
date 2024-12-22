@@ -13,6 +13,32 @@ pub fn run_all_tests() {
     test_game_vs_bot();
 }
 
+/*
+    Run this in main, then open an admin shell. Then run the below command.
+    That will output a `flamegraph.svg` that can be opened in a browser and inspected.
+    Make sure you have DTrace installed!
+
+    Flamegraph docs: https://github.com/flamegraph-rs/flamegraph?tab=readme-ov-file#flamegraphs-are-the-beginning-not-the-end
+
+    URL to generated file (paste in browser): file:///A:/github_projects/chess-engine/flamegraph.svg
+
+    cd A:\github_projects\chess-engine
+    cargo flamegraph
+*/
+pub fn test_performance_of_minimax() {
+    use std::time::Instant;
+    let now = Instant::now();
+    println!("Testing minimax function.");
+    let mut test_game = g::Game::default();
+    test_game.import_fen("r4b1k/7r/1pp5/p2R3p/P5bP/2P3R1/2P2PP1/2B2BK1 w - - 0 31");
+    test_game.print_board();
+    let m = test_game.get_bot_move();
+    println!("Bot says to play: {m}");
+
+    let elapsed = now.elapsed();
+    println!("Elapsed: {:.2?}", elapsed);
+}
+
 pub fn test_bishop_attacks() {
     let mut game = g::Game::default();
     game.import_fen("rnbqkbnr/pppppppp/8/8/8/8/PPP1PPPP/RNBQKBNR w KQkq - 0 1");

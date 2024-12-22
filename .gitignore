@@ -22,3 +22,7 @@ Cargo.lock
 
 # We don't need executables in the repo.
 *.exe
+
+# Ignore performance testing results.
+benchmarks.md
+flamegraph.svg

@@ -706,7 +706,7 @@ impl Game {
         for legal_move in self.legal_moves.iter() {
             let mut game_copy = self.clone();
             game_copy.make_move_and_update_state(legal_move);
-            let minimax_eval = game_copy.minimax(3, f64::NEG_INFINITY, f64::INFINITY);
+            let minimax_eval = game_copy.minimax(4, f64::NEG_INFINITY, f64::INFINITY);
             if self.white_to_move && minimax_eval > best_eval {
                 best_eval = minimax_eval;
                 best_move = *legal_move;

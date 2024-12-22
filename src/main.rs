@@ -13,4 +13,5 @@ pub mod tests;
 #[tokio::main]
 async fn main() {
     let _ = lichess::main().await;
+    //let _ = tests::test_performance_of_minimax();
 }
