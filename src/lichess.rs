@@ -1,14 +1,16 @@
-use std::env;
-use core::str;
 use crate::{constants, g, lichess_structs, my_move};
+use core::str;
 use std::collections::HashMap;
+use std::env;
 
 pub async fn main() -> Result<(), String> {
     // Try to get the bearer auth token.
     let lichess_auth_token = match env::var("LICHESS_BOT_API_TOKEN") {
         Ok(s) => s,
         Err(e) => {
-            return Err(format!("Error reading ENV var: `LICHESS_BOT_API_TOKEN`. Make sure it is set! Detail: {e}"));
+            return Err(format!(
+                "Error reading ENV var: `LICHESS_BOT_API_TOKEN`. Make sure it is set! Detail: {e}"
+            ));
         }
     };
 
@@ -21,11 +23,8 @@ pub async fn main() -> Result<(), String> {
 async fn play_game(token: &str, game_id: &str, fen: &str) {
     let lichess_url = format!("https://lichess.org/api/bot/game/stream/{game_id}");
     let client: reqwest::Client = reqwest::Client::new();
-    let response_result: Result<reqwest::Response, reqwest::Error> = client
-        .get(lichess_url)
-        .bearer_auth(token)
-        .send()
-        .await;
+    let response_result: Result<reqwest::Response, reqwest::Error> =
+        client.get(lichess_url).bearer_auth(token).send().await;
 
     // TODO: Handle errors with game stream?
     let mut response = match response_result {
@@ -61,8 +60,10 @@ async fn play_game(token: &str, game_id: &str, fen: &str) {
             println!("Opponent left. Code not set up to handle this.");
             continue;
         } else if full_str.contains("\"type\":\"chatLine\"") {
-            let lichess_chat_line_parse_attempt: Result<lichess_structs::ChatLineEvent, serde_json::Error> =
-                serde_json::from_str(full_str);
+            let lichess_chat_line_parse_attempt: Result<
+                lichess_structs::ChatLineEvent,
+                serde_json::Error,
+            > = serde_json::from_str(full_str);
             let chat_event: lichess_structs::ChatLineEvent = match lichess_chat_line_parse_attempt {
                 Ok(g) => g,
                 Err(e) => {
@@ -76,9 +77,10 @@ async fn play_game(token: &str, game_id: &str, fen: &str) {
                 println!("{}", game.get_debug_game_state_str());
                 let _ = write_chat_message(
                     token,
-                    &lichess_game.id, 
-                    "Message recieved. Check the console."
-                ).await;
+                    &lichess_game.id,
+                    "Message recieved. Check the console.",
+                )
+                .await;
             }
             continue;
         } else if full_str.contains("\"type\":\"gameFull\"") {
@@ -103,8 +105,10 @@ async fn play_game(token: &str, game_id: &str, fen: &str) {
             // Import the FEN, let the rest below handle the rest. Game state is now set.
             game.import_fen(fen);
         } else if full_str.contains("\"type\":\"gameState\"") {
-            let lichess_game_state_parse_attempt: Result<lichess_structs::GameState, serde_json::Error> =
-                serde_json::from_str(full_str);
+            let lichess_game_state_parse_attempt: Result<
+                lichess_structs::GameState,
+                serde_json::Error,
+            > = serde_json::from_str(full_str);
             let lichess_game_state = match lichess_game_state_parse_attempt {
                 Ok(g) => g,
                 Err(e) => {
@@ -154,10 +158,7 @@ async fn play_game(token: &str, game_id: &str, fen: &str) {
         println!("Bot thinks we should play: {}", bot_move);
 
         // Try to make the move.
-        let move_result = make_move(
-            token,
-            &lichess_game.id,
-            &bot_move.to_string()).await;
+        let move_result = make_move(token, &lichess_game.id, &bot_move.to_string()).await;
 
         // Handle errors in the console.
         let _ = match move_result {
@@ -173,11 +174,8 @@ async fn play_game(token: &str, game_id: &str, fen: &str) {
 async fn make_move(token: &str, game_id: &str, r#move: &str) -> Result<(), String> {
     let lichess_url = format!("https://lichess.org/api/bot/game/{game_id}/move/{move}");
     let client: reqwest::Client = reqwest::Client::new();
-    let response_result: Result<reqwest::Response, reqwest::Error> = client
-        .post(lichess_url)
-        .bearer_auth(token)
-        .send()
-        .await;
+    let response_result: Result<reqwest::Response, reqwest::Error> =
+        client.post(lichess_url).bearer_auth(token).send().await;
 
     let parsed_response = match response_result {
         Ok(r) => r,
@@ -187,7 +185,11 @@ async fn make_move(token: &str, game_id: &str, r#move: &str) -> Result<(), Strin
     };
 
     if parsed_response.status() != 200 {
-        return Err(format!("Something went wrong trying to make a move: {}.\nAPI response: {:#?}.", r#move, parsed_response.text().await));
+        return Err(format!(
+            "Something went wrong trying to make a move: {}.\nAPI response: {:#?}.",
+            r#move,
+            parsed_response.text().await
+        ));
     }
 
     return Ok(());
@@ -233,7 +235,8 @@ async fn run(token: &str) {
         // Look through the bytes we got, se expect a few possible items here.
         if full_str.contains("\"type\":\"challenge\"") {
             // Attempt to parse accordingly.
-            let lichess_challenge_raw: Result<lichess_structs::Challenge, serde_json::Error> = serde_json::from_str(full_str);
+            let lichess_challenge_raw: Result<lichess_structs::Challenge, serde_json::Error> =
+                serde_json::from_str(full_str);
             let lichess_challenge = match lichess_challenge_raw {
                 Ok(c) => c.challenge,
                 Err(e) => {
@@ -243,8 +246,13 @@ async fn run(token: &str) {
             };
 
             // For now, only accept challenges from me.
-            if !constants::LICHESS_CHALLENGER_WHITELIST.contains(&lichess_challenge.challenger.name.as_str()) {
-                println!("Challenger {} is not on the whitelist. Ignoring for now.", lichess_challenge.challenger.name);
+            if !constants::LICHESS_CHALLENGER_WHITELIST
+                .contains(&lichess_challenge.challenger.name.as_str())
+            {
+                println!(
+                    "Challenger {} is not on the whitelist. Ignoring for now.",
+                    lichess_challenge.challenger.name
+                );
                 continue;
             }
 
@@ -252,7 +260,10 @@ async fn run(token: &str) {
             let _ = accept_challenge(token, &lichess_challenge.id).await;
         } else if full_str.contains("\"type\":\"gameStart\"") {
             // Attempt to parse accordingly.
-            let lichess_challenge_start: Result<lichess_structs::ChallengeGameStart, serde_json::Error> = serde_json::from_str(full_str);
+            let lichess_challenge_start: Result<
+                lichess_structs::ChallengeGameStart,
+                serde_json::Error,
+            > = serde_json::from_str(full_str);
             let lichess_game_full = match lichess_challenge_start {
                 Ok(c) => c.game,
                 Err(e) => {
@@ -288,11 +299,8 @@ async fn run(token: &str) {
 async fn accept_challenge(token: &str, game_id: &str) -> Result<(), String> {
     let lichess_url = format!("https://lichess.org/api/challenge/{game_id}/accept");
     let client: reqwest::Client = reqwest::Client::new();
-    let response_result: Result<reqwest::Response, reqwest::Error> = client
-        .post(lichess_url)
-        .bearer_auth(token)
-        .send()
-        .await;
+    let response_result: Result<reqwest::Response, reqwest::Error> =
+        client.post(lichess_url).bearer_auth(token).send().await;
 
     let parsed_response = match response_result {
         Ok(r) => r,
@@ -302,7 +310,10 @@ async fn accept_challenge(token: &str, game_id: &str) -> Result<(), String> {
     };
 
     if parsed_response.status() != 200 {
-        return Err(format!("Something went wrong trying to accept challenge.\nAPI response: {:#?}.", parsed_response.text().await));
+        return Err(format!(
+            "Something went wrong trying to accept challenge.\nAPI response: {:#?}.",
+            parsed_response.text().await
+        ));
     }
 
     return Ok(());
@@ -330,7 +341,10 @@ async fn write_chat_message(token: &str, game_id: &str, message: &str) -> Result
     };
 
     if parsed_response.status() != 200 {
-        return Err(format!("Something went wrong trying to write chat message.\nAPI response: {:#?}.", parsed_response.text().await));
+        return Err(format!(
+            "Something went wrong trying to write chat message.\nAPI response: {:#?}.",
+            parsed_response.text().await
+        ));
     }
 
     return Ok(());

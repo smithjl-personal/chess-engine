@@ -99,11 +99,10 @@ impl Default for GameFull {
     }
 }
 
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Challenge {
     pub r#type: String,
-    pub challenge: InnerChallenge
+    pub challenge: InnerChallenge,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

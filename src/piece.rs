@@ -443,7 +443,6 @@ impl Piece {
         // Try out every move. See if it's illegal.
         let mut moves_final: Vec<Move> = vec![];
         for m in moves.iter_mut() {
-
             // Don't add illegal moves.
             if game.does_move_put_self_in_check(m) {
                 continue;
