@@ -426,9 +426,9 @@ impl Piece {
                 if can_promote {
                     for m in temporary_moves.iter() {
                         for t in PAWN_PROMOTION_CHOICES {
-                            let mut copy_move = m.clone();
-                            copy_move.pawn_promoting_to = Some(t);
-                            moves.push(copy_move);
+                            let mut temp_move = *m;
+                            temp_move.pawn_promoting_to = Some(t);
+                            moves.push(temp_move);
                         }
                     }
                 } else {
