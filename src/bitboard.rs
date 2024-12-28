@@ -63,7 +63,7 @@ pub struct Constants {
     pub knight_attacks: [u64; 64],
     pub king_attacks: [u64; 64],
     pub bishop_attacks: Vec<Vec<u64>>, // [64][512]
-    pub rook_attacks: Vec<Vec<u64>>, // [64][4096]
+    pub rook_attacks: Vec<Vec<u64>>,   // [64][4096]
 }
 
 impl Constants {
@@ -77,8 +77,10 @@ impl Constants {
         let mut rook_attacks: Vec<Vec<u64>> = vec![vec![0; 4096]; 64];
 
         for square in 0..64 {
-            pawn_attacks[Color::White.idx()][square] = mask_pawn_attacks(square as u64, Color::White);
-            pawn_attacks[Color::Black.idx()][square] = mask_pawn_attacks(square as u64, Color::Black);
+            pawn_attacks[Color::White.idx()][square] =
+                mask_pawn_attacks(square as u64, Color::White);
+            pawn_attacks[Color::Black.idx()][square] =
+                mask_pawn_attacks(square as u64, Color::Black);
 
             knight_attacks[square] = mask_knight_attacks(square as u64);
             king_attacks[square] = mask_king_attacks(square as u64);
@@ -98,7 +100,7 @@ impl Constants {
 }
 
 // TODO: Research more on lifetime stuff.
-pub struct ChessGame <'a> {
+pub struct ChessGame<'a> {
     pub bitboard_constants: &'a Constants,
 
     // En-Passant
@@ -133,7 +135,7 @@ pub struct ChessGame <'a> {
     pub all_occupancies: u64,
 }
 
-impl <'a> ChessGame <'a> {
+impl<'a> ChessGame<'a> {
     pub fn new(c: &'a Constants) -> Self {
         return ChessGame {
             bitboard_constants: c,
@@ -163,9 +165,8 @@ impl <'a> ChessGame <'a> {
             white_occupancies: 0,
             black_occupancies: 0,
             all_occupancies: 0,
-        }
+        };
     }
-
 
     // Takes all pieces off the board.
     pub fn clear_board(&mut self) {
@@ -187,7 +188,6 @@ impl <'a> ChessGame <'a> {
         self.black_occupancies = 0;
         self.all_occupancies = 0;
     }
-
 
     // TODO: Finish this...
     pub fn print_board(&self) {
@@ -216,7 +216,6 @@ impl <'a> ChessGame <'a> {
         }
         println!("    A   B   C   D   E   F   G   H");
     }
-
 
     // TODO: Consider robust error handling rather than `panic` usage.
     pub fn import_fen(&mut self, fen: &str) -> Result<(), String> {
@@ -250,7 +249,7 @@ impl <'a> ChessGame <'a> {
                     };
 
                     if num_empties < 1 || num_empties > 8 {
-                        return Err(format!("Invalid number of empty spaces: {}", num_empties))
+                        return Err(format!("Invalid number of empty spaces: {}", num_empties));
                     }
 
                     x_pos += num_empties;
@@ -278,13 +277,15 @@ impl <'a> ChessGame <'a> {
                 let square = y_pos * 8 + x_pos;
                 self.place_piece_on_board(piece_color, piece_type, square as u64);
 
-
                 x_pos += 1;
             }
 
             // Ensure that the board has exactly 8 cols.
             if x_pos != 8 {
-                return Err(format!("Board must have exactly 8 columns. We parsed: {}", x_pos));
+                return Err(format!(
+                    "Board must have exactly 8 columns. We parsed: {}",
+                    x_pos
+                ));
             }
 
             y_pos += 1;
@@ -292,7 +293,10 @@ impl <'a> ChessGame <'a> {
 
         // Ensure that the board has exactly 8 rows.
         if y_pos != 8 {
-            return Err(format!("Board must have exactly 8 rows. We parsed: {}", y_pos));
+            return Err(format!(
+                "Board must have exactly 8 rows. We parsed: {}",
+                y_pos
+            ));
         }
 
         // Store whose turn it is to move.
@@ -378,7 +382,6 @@ impl <'a> ChessGame <'a> {
         return Ok(());
     }
 
-
     pub fn place_piece_on_board(&mut self, side: Color, piece_type: PieceType, square: u64) {
         match side {
             Color::White => {
@@ -407,7 +410,6 @@ impl <'a> ChessGame <'a> {
 
         self.all_occupancies = set_bit(self.all_occupancies, square);
     }
-
 
     // WARNING: Not efficient function??
     pub fn get_piece_at_square(&self, square: u64) -> (Option<PieceType>, Option<Color>) {
@@ -454,51 +456,78 @@ impl <'a> ChessGame <'a> {
         } else {
             panic!("Someting has gone very wrong.");
         }
-        
-    } 
-
+    }
 
     // Bitwise operations make this pretty quick.
     pub fn is_square_attacked(&self, square: usize, who_is_attacking: Color) -> bool {
         match who_is_attacking {
             Color::White => {
-
                 // Pawns.
-                if self.bitboard_constants.pawn_attacks[Color::Black.idx()][square] & self.white_pawns != 0 { return true; }
+                if self.bitboard_constants.pawn_attacks[Color::Black.idx()][square]
+                    & self.white_pawns
+                    != 0
+                {
+                    return true;
+                }
 
                 // Knights.
-                if self.bitboard_constants.knight_attacks[square] & self.white_knights != 0 { return true}
+                if self.bitboard_constants.knight_attacks[square] & self.white_knights != 0 {
+                    return true;
+                }
 
                 // Bishops.
-                if self.get_bishop_attacks(square, self.all_occupancies) & self.white_bishops != 0 { return true}
+                if self.get_bishop_attacks(square, self.all_occupancies) & self.white_bishops != 0 {
+                    return true;
+                }
 
                 // Rooks.
-                if self.get_rook_attacks(square, self.all_occupancies) & self.white_rooks != 0 { return true}
+                if self.get_rook_attacks(square, self.all_occupancies) & self.white_rooks != 0 {
+                    return true;
+                }
 
                 // Queens. (we could speed this up slightly... look here for optimization if needed.)
-                if self.get_queen_attacks(square, self.all_occupancies) & self.white_queens != 0 { return true}
+                if self.get_queen_attacks(square, self.all_occupancies) & self.white_queens != 0 {
+                    return true;
+                }
 
                 // King.
-                if self.bitboard_constants.king_attacks[square] & self.white_king != 0 { return true }
+                if self.bitboard_constants.king_attacks[square] & self.white_king != 0 {
+                    return true;
+                }
             }
             Color::Black => {
                 // Pawns.
-                if self.bitboard_constants.pawn_attacks[Color::White.idx()][square] & self.black_pawns != 0 { return true; }
+                if self.bitboard_constants.pawn_attacks[Color::White.idx()][square]
+                    & self.black_pawns
+                    != 0
+                {
+                    return true;
+                }
 
                 // Knights.
-                if self.bitboard_constants.knight_attacks[square] & self.black_knights != 0 { return true}
+                if self.bitboard_constants.knight_attacks[square] & self.black_knights != 0 {
+                    return true;
+                }
 
                 // Bishops.
-                if self.get_bishop_attacks(square, self.all_occupancies) & self.black_bishops != 0 { return true}
+                if self.get_bishop_attacks(square, self.all_occupancies) & self.black_bishops != 0 {
+                    return true;
+                }
 
                 // Rooks.
-                if self.get_rook_attacks(square, self.all_occupancies) & self.black_rooks != 0 { return true}
+                if self.get_rook_attacks(square, self.all_occupancies) & self.black_rooks != 0 {
+                    return true;
+                }
 
                 // Queens. (we could speed this up slightly... look here for optimization if needed.)
-                if self.get_queen_attacks(square, self.all_occupancies) & self.black_queens != 0 { return true}
+                if self.get_queen_attacks(square, self.all_occupancies) & self.black_queens != 0 {
+                    return true;
+                }
 
                 // King.
-                if self.bitboard_constants.king_attacks[square] & self.black_king != 0 { return true }
+                if self.bitboard_constants.king_attacks[square] & self.black_king != 0 {
+                    return true;
+                }
             }
         };
 
@@ -506,46 +535,27 @@ impl <'a> ChessGame <'a> {
         return false;
     }
 
-
-
-    pub fn get_bishop_attacks(
-        &self,
-        square: usize,
-        mut occupancy: u64,
-    ) -> u64 {
-    
+    pub fn get_bishop_attacks(&self, square: usize, mut occupancy: u64) -> u64 {
         occupancy &= constants::BISHOP_MASKED_ATTACKS[square];
         (occupancy, _) = occupancy.overflowing_mul(constants::BISHOP_MAGIC_NUMBERS[square]);
         occupancy >>= 64 - constants::BISHOP_RELEVANT_BITS[square];
-    
+
         return self.bitboard_constants.bishop_attacks[square][occupancy as usize];
     }
 
-
-    pub fn get_rook_attacks(
-        &self,
-        square: usize,
-        mut occupancy: u64,
-    ) -> u64 {
+    pub fn get_rook_attacks(&self, square: usize, mut occupancy: u64) -> u64 {
         occupancy &= constants::ROOK_MASKED_ATTACKS[square];
         (occupancy, _) = occupancy.overflowing_mul(constants::ROOK_MAGIC_NUMBERS[square]);
         occupancy >>= 64 - constants::ROOK_RELEVANT_BITS[square];
-    
+
         return self.bitboard_constants.rook_attacks[square][occupancy as usize];
     }
 
-
-    pub fn get_queen_attacks(
-        &self,
-        square: usize,
-        occupancy: u64,
-    ) -> u64 {
-        return self.get_bishop_attacks(square, occupancy) | self.get_rook_attacks(square, occupancy);
+    pub fn get_queen_attacks(&self, square: usize, occupancy: u64) -> u64 {
+        return self.get_bishop_attacks(square, occupancy)
+            | self.get_rook_attacks(square, occupancy);
     }
-
 }
-
-
 
 pub fn print_bitboard(bitboard: u64) {
     println!("    A   B   C   D   E   F   G   H");
@@ -571,8 +581,6 @@ pub fn print_bitboard(bitboard: u64) {
     println!("    A   B   C   D   E   F   G   H");
     println!("Bitboard Value: {bitboard}");
 }
-
-
 
 pub fn mask_pawn_attacks(square: u64, side: Color) -> u64 {
     let mut attacks: u64 = 0;
@@ -601,7 +609,6 @@ pub fn mask_pawn_attacks(square: u64, side: Color) -> u64 {
     return attacks;
 }
 
-
 pub fn mask_knight_attacks(square: u64) -> u64 {
     let mut attacks: u64 = 0;
     let mut bitboard: u64 = 0;
@@ -615,8 +622,6 @@ pub fn mask_knight_attacks(square: u64) -> u64 {
     attacks |= (bitboard >> 6) & NOT_FILE_AB; // Up 1 Right 2
     attacks |= (bitboard >> 15) & NOT_FILE_A; // Up 2 Right 1
 
-
-
     attacks |= (bitboard << 6) & NOT_FILE_GH; // Down 1 Left 2
     attacks |= (bitboard << 15) & NOT_FILE_H; // Down 2 Left 1
 
@@ -625,7 +630,6 @@ pub fn mask_knight_attacks(square: u64) -> u64 {
 
     return attacks;
 }
-
 
 pub fn mask_king_attacks(square: u64) -> u64 {
     let mut attacks: u64 = 0;
@@ -647,7 +651,6 @@ pub fn mask_king_attacks(square: u64) -> u64 {
 
     return attacks;
 }
-
 
 // Function a bit different than the others, it doesn't actually generate all the attacks...
 pub fn mask_bishop_attacks(square: u64) -> u64 {
@@ -713,8 +716,6 @@ pub fn mask_bishop_attacks(square: u64) -> u64 {
 
     return attacks;
 }
-
-
 
 // Function a bit different than the others, it doesn't actually generate all the attacks...
 pub fn dynamic_bishop_attacks(square: u64, block: u64) -> u64 {
@@ -818,9 +819,6 @@ pub fn dynamic_bishop_attacks(square: u64, block: u64) -> u64 {
     return attacks;
 }
 
-
-
-
 // Function a bit different than the others, it doesn't actually generate all the attacks...
 pub fn mask_rook_attacks(square: u64) -> u64 {
     let mut attacks: u64 = 0;
@@ -869,14 +867,8 @@ pub fn mask_rook_attacks(square: u64) -> u64 {
         rank += 1;
     }
 
-
-
-
-
-    
     return attacks;
 }
-
 
 // Function a bit different than the others, it doesn't actually generate all the attacks...
 pub fn dynamic_rook_attacks(square: u64, block: u64) -> u64 {
@@ -963,7 +955,6 @@ pub fn dynamic_rook_attacks(square: u64, block: u64) -> u64 {
     return attacks;
 }
 
-
 // Should this be an enum?
 pub fn str_coord_to_square(s: &str) -> Result<usize, String> {
     if s.len() != 2 {
@@ -988,9 +979,8 @@ pub fn str_coord_to_square(s: &str) -> Result<usize, String> {
         None => return Err(format!("Unable to convert `{}` to a digit.", rank_str)),
     };
 
-    return Ok(rank * 8 + file)
+    return Ok(rank * 8 + file);
 }
-
 
 // I don't understand how this works yet...
 pub fn set_occupancies(index: usize, bits_in_mask: usize, mut attack_mask: u64) -> u64 {
@@ -998,7 +988,6 @@ pub fn set_occupancies(index: usize, bits_in_mask: usize, mut attack_mask: u64) 
 
     // Loop over bit range in attack mask.
     for count in 0..bits_in_mask {
-
         // Get LSB of attack mask.
         let square = match get_lsb_index(attack_mask) {
             Ok(v) => v,
@@ -1018,14 +1007,12 @@ pub fn set_occupancies(index: usize, bits_in_mask: usize, mut attack_mask: u64) 
     }
 
     return occupancy;
-
 }
-
 
 pub fn init_slider_attacks(
     is_bishop: bool,
     bishop_attacks: &mut Vec<Vec<u64>>,
-    rook_attacks: &mut Vec<Vec<u64>>
+    rook_attacks: &mut Vec<Vec<u64>>,
 ) {
     for square in 0..64 {
         let attack_mask;
@@ -1042,27 +1029,21 @@ pub fn init_slider_attacks(
                 let occupancy = set_occupancies(index, relevant_bits_count, attack_mask);
                 let (temp, _) = occupancy.overflowing_mul(constants::BISHOP_MAGIC_NUMBERS[square]);
                 let magic_index = (temp) >> 64 - constants::BISHOP_RELEVANT_BITS[square];
-                bishop_attacks[square][magic_index as usize] = dynamic_bishop_attacks(square as u64, occupancy);
+                bishop_attacks[square][magic_index as usize] =
+                    dynamic_bishop_attacks(square as u64, occupancy);
             } else {
                 let occupancy = set_occupancies(index, relevant_bits_count, attack_mask);
                 let (temp, _) = occupancy.overflowing_mul(constants::ROOK_MAGIC_NUMBERS[square]);
                 let magic_index = (temp) >> 64 - constants::ROOK_RELEVANT_BITS[square];
-                rook_attacks[square][magic_index as usize] = dynamic_rook_attacks(square as u64, occupancy);
+                rook_attacks[square][magic_index as usize] =
+                    dynamic_rook_attacks(square as u64, occupancy);
             }
         }
     }
 }
 
-
-
-
 // TODO: Figure out how to structure code that allows this to work... Pass in the constants?
-pub fn get_bishop_attacks(
-    c: &Constants,
-    square: usize,
-    mut occupancy: u64,
-) -> u64 {
-
+pub fn get_bishop_attacks(c: &Constants, square: usize, mut occupancy: u64) -> u64 {
     occupancy &= constants::BISHOP_MASKED_ATTACKS[square];
     (occupancy, _) = occupancy.overflowing_mul(constants::BISHOP_MAGIC_NUMBERS[square]);
     occupancy >>= 64 - constants::BISHOP_RELEVANT_BITS[square];
@@ -1070,12 +1051,7 @@ pub fn get_bishop_attacks(
     return c.bishop_attacks[square][occupancy as usize];
 }
 
-
-pub fn get_rook_attacks(
-    c: &Constants,
-    square: usize,
-    mut occupancy: u64,
-) -> u64 {
+pub fn get_rook_attacks(c: &Constants, square: usize, mut occupancy: u64) -> u64 {
     occupancy &= constants::ROOK_MASKED_ATTACKS[square];
     (occupancy, _) = occupancy.overflowing_mul(constants::ROOK_MAGIC_NUMBERS[square]);
     occupancy >>= 64 - constants::ROOK_RELEVANT_BITS[square];
@@ -1083,14 +1059,9 @@ pub fn get_rook_attacks(
     return c.rook_attacks[square][occupancy as usize];
 }
 
-pub fn get_queen_attacks(
-    c: &Constants,
-    square: usize,
-    occupancy: u64,
-) -> u64 {
+pub fn get_queen_attacks(c: &Constants, square: usize, occupancy: u64) -> u64 {
     return get_bishop_attacks(c, square, occupancy) | get_rook_attacks(c, square, occupancy);
 }
-
 
 // Should these be macros? Or something similar?
 pub fn get_bit(bitboard: u64, square: u64) -> u64 {
@@ -1137,9 +1108,8 @@ pub fn get_lsb_index(bitboard: u64) -> Result<usize, String> {
     return Ok(count_bits(populated));
 }
 
-
 /*
-    // This is the code we used to generate magic numbers. We don't need to run it again, but it should remain. 
+    // This is the code we used to generate magic numbers. We don't need to run it again, but it should remain.
     struct MagicNumberHelper {
         pub state: u32,
     }

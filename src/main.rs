@@ -1,3 +1,4 @@
+pub mod bitboard;
 pub mod castle_sides;
 pub mod constants;
 pub mod coord;
@@ -9,7 +10,6 @@ pub mod my_move;
 pub mod piece;
 pub mod piece_type;
 pub mod tests;
-pub mod bitboard;
 
 #[tokio::main]
 async fn main() {
@@ -23,8 +23,8 @@ async fn main() {
     new_game.print_board();
 
     let is_attacked = new_game.is_square_attacked(
-        bitboard::str_coord_to_square("h1").unwrap(), 
-        bitboard::Color::Black
+        bitboard::str_coord_to_square("h1").unwrap(),
+        bitboard::Color::Black,
     );
 
     if is_attacked {
@@ -32,6 +32,4 @@ async fn main() {
     } else {
         println!("That square is NOT attacked.");
     }
-
-
 }

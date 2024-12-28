@@ -28,16 +28,16 @@ pub const LICHESS_CHALLENGER_WHITELIST: [&str; 1] = ["The_Big_C"];
 // These are precalculated, they are expensive to calculate.
 pub const ROOK_MAGIC_NUMBERS: [u64; 64] = [
     9979994641325359136,
-    90072129987412032,  
-    180170925814149121, 
-    72066458867205152,  
-    144117387368072224, 
-    216203568472981512, 
+    90072129987412032,
+    180170925814149121,
+    72066458867205152,
+    144117387368072224,
+    216203568472981512,
     9547631759814820096,
     2341881152152807680,
-    140740040605696,    
+    140740040605696,
     2316046545841029184,
-    72198468973629440,  
+    72198468973629440,
     81205565149155328,
     146508277415412736,
     703833479054336,
@@ -184,7 +184,7 @@ pub const ROOK_RELEVANT_BITS: [usize; 64] = [
     12, 11, 11, 11, 11, 11, 11, 12,
 ];
 
-/** 
+/**
  * Bitboards for all squares controlled by bishop and rook. Excludes the outer ring.
  * See `mask_rook_attacks` and `mask_bishop_attacks` functions.
  */
