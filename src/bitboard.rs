@@ -189,7 +189,6 @@ impl<'a> ChessGame<'a> {
         self.all_occupancies = 0;
     }
 
-    // TODO: Finish this...
     pub fn print_board(&self) {
         // do something...
         println!("    A   B   C   D   E   F   G   H");
@@ -200,14 +199,11 @@ impl<'a> ChessGame<'a> {
                 let square: u64 = rank * 8 + file;
 
                 let (piece_type, color) = self.get_piece_at_square(square);
+                let c = match piece_type {
+                    Some(t) => t.to_char(color.unwrap()),
+                    None => ' ',
+                };
 
-                // If nothing is there, print a space and go next.
-                if piece_type.is_none() {
-                    print!("   |");
-                    continue;
-                }
-
-                let c = piece_type.unwrap().to_char(color.unwrap());
                 print!(" {} |", c);
             }
             print!(" {}", 8 - rank);
@@ -217,7 +213,6 @@ impl<'a> ChessGame<'a> {
         println!("    A   B   C   D   E   F   G   H");
     }
 
-    // TODO: Consider robust error handling rather than `panic` usage.
     pub fn import_fen(&mut self, fen: &str) -> Result<(), String> {
         // Clear the board.
         self.clear_board();
@@ -555,6 +550,38 @@ impl<'a> ChessGame<'a> {
         return self.get_bishop_attacks(square, occupancy)
             | self.get_rook_attacks(square, occupancy);
     }
+
+    pub fn print_legal_moves(&self) {
+        let mut source_square: usize;
+        let mut target_square: usize;
+
+        let mut bitboard: u64 = 0;
+        let mut attacks: u64 = 0;
+
+        // For each piece type, apply the logic.
+        // White Pawns
+        bitboard = self.white_pawns;
+        while bitboard != 0 {
+            source_square = get_lsb_index(bitboard).expect("This should not fail.");
+
+            // Make sure square above is empty.
+            target_square = source_square - 8;
+            let is_occupied = get_bit(self.all_occupancies, target_square as u64) != 0;
+
+            // If pawn is on the 2nd rank, it can move two tiles.
+
+            // Empty the board! and go next.
+            bitboard = pop_bit(bitboard, source_square as u64);
+        }
+    }
+}
+
+pub fn square_to_coord(square: usize) -> String {
+    let rank = 8 - (square / 8);
+    let file_number = square % 8;
+    let file_char = ('a' as u8 + file_number as u8) as char;
+
+    return format!("{}{}", file_char, rank);
 }
 
 pub fn print_bitboard(bitboard: u64) {
@@ -990,10 +1017,9 @@ pub fn set_occupancies(index: usize, bits_in_mask: usize, mut attack_mask: u64) 
     for count in 0..bits_in_mask {
         // Get LSB of attack mask.
         let square = match get_lsb_index(attack_mask) {
-            Ok(v) => v,
-            Err(m) => {
-                // For now, just panic. This shouldn't happen here?
-                panic!("{}", m);
+            Some(v) => v,
+            None => {
+                panic!("Unable to set occupancies, unexpected value for `get_lsb_index`.");
             }
         };
 
@@ -1093,10 +1119,10 @@ pub fn count_bits(mut bitboard: u64) -> usize {
     return bit_count;
 }
 
-pub fn get_lsb_index(bitboard: u64) -> Result<usize, String> {
+pub fn get_lsb_index(bitboard: u64) -> Option<usize> {
     // Below operations will not work on bitboard of `0`.
     if bitboard == 0 {
-        return Err("Illegal index requested.".to_string());
+        return None;
     }
 
     // Get the position of the least-significant bit, using some bit magic!
@@ -1105,7 +1131,7 @@ pub fn get_lsb_index(bitboard: u64) -> Result<usize, String> {
     // Subtract `1` to populate the trailing bits.
     let populated = lsb - 1;
 
-    return Ok(count_bits(populated));
+    return Some(count_bits(populated));
 }
 
 /*
