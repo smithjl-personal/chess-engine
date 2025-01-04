@@ -78,12 +78,12 @@ impl Constants {
 
         for square in 0..64 {
             pawn_attacks[Color::White.idx()][square] =
-                mask_pawn_attacks(square as u64, Color::White);
+                mask_pawn_attacks(square, Color::White);
             pawn_attacks[Color::Black.idx()][square] =
-                mask_pawn_attacks(square as u64, Color::Black);
+                mask_pawn_attacks(square, Color::Black);
 
-            knight_attacks[square] = mask_knight_attacks(square as u64);
-            king_attacks[square] = mask_king_attacks(square as u64);
+            knight_attacks[square] = mask_knight_attacks(square);
+            king_attacks[square] = mask_king_attacks(square);
         }
 
         init_slider_attacks(true, &mut bishop_attacks, &mut rook_attacks);
@@ -196,7 +196,7 @@ impl<'a> ChessGame<'a> {
         for rank in 0..8 {
             print!("{} |", 8 - rank);
             for file in 0..8 {
-                let square: u64 = rank * 8 + file;
+                let square: usize = rank * 8 + file;
 
                 let (piece_type, color) = self.get_piece_at_square(square);
                 let c = match piece_type {
@@ -229,17 +229,17 @@ impl<'a> ChessGame<'a> {
 
         // Prepare to populate our board.
         let rows = board_str.split('/');
-        let mut y_pos = 0;
+        let mut y_pos: usize = 0;
 
         // Parse each row of the board.
         for row in rows {
             // For each char in the row, we will either have a character or a number.
-            let mut x_pos = 0;
+            let mut x_pos: usize = 0;
             for c in row.chars() {
                 // Handles empty spaces on the board.
                 if c.is_digit(10) {
-                    let num_empties = match c.to_digit(10) {
-                        Some(n) => n,
+                    let num_empties: usize = match c.to_digit(10) {
+                        Some(n) => n as usize,
                         None => return Err(format!("Failed to parse digit: {}.", c)),
                     };
 
@@ -269,8 +269,8 @@ impl<'a> ChessGame<'a> {
                     _ => return Err(format!("Unexpected piece letter {}", c)),
                 };
 
-                let square = y_pos * 8 + x_pos;
-                self.place_piece_on_board(piece_color, piece_type, square as u64);
+                let square: usize = y_pos * 8 + x_pos;
+                self.place_piece_on_board(piece_color, piece_type, square);
 
                 x_pos += 1;
             }
@@ -377,7 +377,7 @@ impl<'a> ChessGame<'a> {
         return Ok(());
     }
 
-    pub fn place_piece_on_board(&mut self, side: Color, piece_type: PieceType, square: u64) {
+    pub fn place_piece_on_board(&mut self, side: Color, piece_type: PieceType, square: usize) {
         match side {
             Color::White => {
                 match piece_type {
@@ -407,7 +407,7 @@ impl<'a> ChessGame<'a> {
     }
 
     // WARNING: Not efficient function??
-    pub fn get_piece_at_square(&self, square: u64) -> (Option<PieceType>, Option<Color>) {
+    pub fn get_piece_at_square(&self, square: usize) -> (Option<PieceType>, Option<Color>) {
         let is_occupied = get_bit(self.all_occupancies, square) != 0;
         if !is_occupied {
             return (None, None);
@@ -566,12 +566,12 @@ impl<'a> ChessGame<'a> {
 
             // Make sure square above is empty.
             target_square = source_square - 8;
-            let is_occupied = get_bit(self.all_occupancies, target_square as u64) != 0;
+            let is_occupied = get_bit(self.all_occupancies, target_square) != 0;
 
             // If pawn is on the 2nd rank, it can move two tiles.
 
             // Empty the board! and go next.
-            bitboard = pop_bit(bitboard, source_square as u64);
+            bitboard = pop_bit(bitboard, source_square);
         }
     }
 }
@@ -590,7 +590,7 @@ pub fn print_bitboard(bitboard: u64) {
     for rank in 0..8 {
         print!("{} |", 8 - rank);
         for file in 0..8 {
-            let square: u64 = rank * 8 + file;
+            let square: usize = rank * 8 + file;
             let calc = get_bit(bitboard, square);
             let populated;
             if calc != 0 {
@@ -609,7 +609,7 @@ pub fn print_bitboard(bitboard: u64) {
     println!("Bitboard Value: {bitboard}");
 }
 
-pub fn mask_pawn_attacks(square: u64, side: Color) -> u64 {
+pub fn mask_pawn_attacks(square: usize, side: Color) -> u64 {
     let mut attacks: u64 = 0;
     let mut bitboard: u64 = 0;
 
@@ -636,7 +636,7 @@ pub fn mask_pawn_attacks(square: u64, side: Color) -> u64 {
     return attacks;
 }
 
-pub fn mask_knight_attacks(square: u64) -> u64 {
+pub fn mask_knight_attacks(square: usize) -> u64 {
     let mut attacks: u64 = 0;
     let mut bitboard: u64 = 0;
 
@@ -658,7 +658,7 @@ pub fn mask_knight_attacks(square: u64) -> u64 {
     return attacks;
 }
 
-pub fn mask_king_attacks(square: u64) -> u64 {
+pub fn mask_king_attacks(square: usize) -> u64 {
     let mut attacks: u64 = 0;
     let mut bitboard: u64 = 0;
 
@@ -1024,7 +1024,7 @@ pub fn set_occupancies(index: usize, bits_in_mask: usize, mut attack_mask: u64) 
         };
 
         // Pop the bit.
-        attack_mask = pop_bit(attack_mask, square as u64);
+        attack_mask = pop_bit(attack_mask, square);
 
         // Make sure occupancy is on the board.
         if index & (1 << count) != 0 {
@@ -1090,15 +1090,15 @@ pub fn get_queen_attacks(c: &Constants, square: usize, occupancy: u64) -> u64 {
 }
 
 // Should these be macros? Or something similar?
-pub fn get_bit(bitboard: u64, square: u64) -> u64 {
+pub fn get_bit(bitboard: u64, square: usize) -> u64 {
     return bitboard & (1 << square);
 }
 
-pub fn set_bit(bitboard: u64, square: u64) -> u64 {
+pub fn set_bit(bitboard: u64, square: usize) -> u64 {
     return bitboard | (1 << square);
 }
 
-pub fn pop_bit(bitboard: u64, square: u64) -> u64 {
+pub fn pop_bit(bitboard: u64, square: usize) -> u64 {
     if get_bit(bitboard, square) != 0 {
         return bitboard ^ (1 << square);
     } else {

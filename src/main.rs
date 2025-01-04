@@ -22,11 +22,14 @@ async fn main() {
     let _ = new_game.import_fen("k7/5n2/3ppp2/8/4Q3/8/8/K7 w - - 0 1");
     new_game.print_board();
 
+    let coord = "a6";
+    let square = bitboard::str_coord_to_square(coord).unwrap();
     let is_attacked = new_game.is_square_attacked(
-        bitboard::str_coord_to_square("h1").unwrap(),
+        square,
         bitboard::Color::Black,
     );
 
+    println!("Square: {}", coord);
     if is_attacked {
         println!("That square is attacked...");
     } else {
