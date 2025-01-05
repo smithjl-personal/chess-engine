@@ -19,20 +19,7 @@ async fn main() {
     let c = bitboard::Constants::new();
     let mut new_game = bitboard::ChessGame::new(&c);
     //let _ = new_game.import_fen(constants::INITIAL_GAME_STATE_FEN);
-    let _ = new_game.import_fen("k7/5n2/3ppp2/8/4Q3/8/8/K7 w - - 0 1");
+    let _ = new_game.import_fen("k5r1/5n1P/3ppp2/1pPR4/1pP1Q3/1P3P1p/P5PP/K7 b - c3 0 1");
     new_game.print_board();
-
-    let coord = "a6";
-    let square = bitboard::str_coord_to_square(coord).unwrap();
-    let is_attacked = new_game.is_square_attacked(
-        square,
-        bitboard::Color::Black,
-    );
-
-    println!("Square: {}", coord);
-    if is_attacked {
-        println!("That square is attacked...");
-    } else {
-        println!("That square is NOT attacked.");
-    }
+    new_game.print_legal_moves();
 }

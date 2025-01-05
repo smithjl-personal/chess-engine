@@ -552,23 +552,98 @@ impl<'a> ChessGame<'a> {
     }
 
     pub fn print_legal_moves(&self) {
+        self.print_legal_moves_pawns();
+    }
+
+    pub fn print_legal_moves_pawns(&self) {
         let mut source_square: usize;
         let mut target_square: usize;
 
-        let mut bitboard: u64 = 0;
-        let mut attacks: u64 = 0;
+        let mut bitboard: u64;
+        let mut attacks: u64;
 
-        // For each piece type, apply the logic.
-        // White Pawns
-        bitboard = self.white_pawns;
+        let our_color: Color;
+        let their_occupancies: u64;
+        let pawn_move_offset: i32;
+        let promotion_rank_lower: usize;
+        let promotion_rank_upper: usize;
+        let our_starting_rank_lower: usize;
+        let our_starting_rank_upper: usize;
+        if self.white_to_move {
+            our_color = Color::White;
+            their_occupancies = self.black_occupancies;
+            bitboard = self.white_pawns;
+            pawn_move_offset = -8;
+            promotion_rank_lower = 0;
+            promotion_rank_upper = 7;
+            our_starting_rank_lower = 48;
+            our_starting_rank_upper = 55;
+        } else {
+            our_color = Color::Black;
+            their_occupancies = self.white_occupancies;
+            bitboard = self.black_pawns;
+            pawn_move_offset = 8;
+            promotion_rank_lower = 56;
+            promotion_rank_upper = 63;
+            our_starting_rank_lower = 8;
+            our_starting_rank_upper = 15;
+        }
+
         while bitboard != 0 {
             source_square = get_lsb_index(bitboard).expect("This should not fail.");
 
-            // Make sure square above is empty.
-            target_square = source_square - 8;
-            let is_occupied = get_bit(self.all_occupancies, target_square) != 0;
+            // Handles forward moves.
+            target_square = (source_square as i32 + pawn_move_offset) as usize;
+            let mut is_occupied = get_bit(self.all_occupancies, target_square) != 0;
+            if !is_occupied {
 
-            // If pawn is on the 2nd rank, it can move two tiles.
+                // Check for promotions (no capture).
+                if target_square >= promotion_rank_lower && target_square <= promotion_rank_upper {
+                    println!("{}{}q", square_to_coord(source_square), square_to_coord(target_square));
+                    println!("{}{}r", square_to_coord(source_square), square_to_coord(target_square));
+                    println!("{}{}b", square_to_coord(source_square), square_to_coord(target_square));
+                    println!("{}{}n", square_to_coord(source_square), square_to_coord(target_square));
+                    
+                } else {
+                    println!("{}{}", square_to_coord(source_square), square_to_coord(target_square));
+
+                    // Check for the double move.
+                    target_square = (source_square as i32 + pawn_move_offset + pawn_move_offset) as usize;
+                    is_occupied = get_bit(self.all_occupancies, target_square) != 0;
+
+                    // If pawn is on the 2nd rank, it can move two tiles.
+                    if source_square >= our_starting_rank_lower && source_square <= our_starting_rank_upper && !is_occupied {
+                        println!("{}{} double move", square_to_coord(source_square), square_to_coord(target_square));
+                    }
+                }
+            }
+
+            // Handles captures (non-en-passant).
+            attacks = self.bitboard_constants.pawn_attacks[our_color.idx()][source_square] & their_occupancies;
+            while attacks != 0 {
+                target_square = get_lsb_index(attacks).expect("Should not be empty.");
+                if target_square >= promotion_rank_lower && target_square <= promotion_rank_upper {
+                    println!("{}{}q capture", square_to_coord(source_square), square_to_coord(target_square));
+                    println!("{}{}r capture", square_to_coord(source_square), square_to_coord(target_square));
+                    println!("{}{}b capture", square_to_coord(source_square), square_to_coord(target_square));
+                    println!("{}{}n capture", square_to_coord(source_square), square_to_coord(target_square));
+                } else {
+                    println!("{}{} capture", square_to_coord(source_square), square_to_coord(target_square));
+                }
+                attacks = pop_bit(attacks, target_square);
+            }
+
+            // Handles captures (en-passant)
+            match self.en_passant_target {
+                Some(s) => {
+                    attacks = self.bitboard_constants.pawn_attacks[our_color.idx()][source_square] & set_bit(0, s);
+                    if attacks != 0 {
+                        println!("{}{} en-passant", square_to_coord(source_square), square_to_coord(s));
+                    }
+                }
+                _ => ()
+            }
+
 
             // Empty the board! and go next.
             bitboard = pop_bit(bitboard, source_square);
