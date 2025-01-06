@@ -1,5 +1,6 @@
 use crate::constants;
 
+#[derive(Clone)]
 pub enum Color {
     White,
     Black,
@@ -454,7 +455,7 @@ impl<'a> ChessGame<'a> {
     }
 
     // Bitwise operations make this pretty quick.
-    pub fn is_square_attacked(&self, square: usize, who_is_attacking: Color) -> bool {
+    pub fn is_square_attacked(&self, square: usize, who_is_attacking: &Color) -> bool {
         match who_is_attacking {
             Color::White => {
                 // Pawns.
@@ -552,7 +553,90 @@ impl<'a> ChessGame<'a> {
     }
 
     pub fn print_legal_moves(&self) {
-        self.print_legal_moves_pawns();
+        self.print_legal_moves_king();
+        //self.print_legal_moves_pawns();
+    }
+
+    pub fn print_legal_moves_king(&self) {
+        let source_square: usize;
+        let mut target_square: usize;
+        let bitboard: u64;
+
+        let their_color: &Color;
+        let their_occupancies: u64;
+        let can_castle_long: bool;
+        let can_castle_short: bool;
+        let king_starting_square: usize;
+        if self.white_to_move {
+            their_color = &Color::Black;
+            their_occupancies = self.black_occupancies;
+            bitboard = self.white_king;
+            can_castle_short = self.can_white_castle_short;
+            can_castle_long = self.can_white_castle_long;
+            king_starting_square = 60;
+        } else {
+            their_color = &Color::White;
+            their_occupancies = self.white_occupancies;
+            bitboard = self.black_king;
+            can_castle_short = self.can_black_castle_short;
+            can_castle_long = self.can_black_castle_long;
+            king_starting_square = 4;
+        }
+
+        if bitboard == 0 {
+            return;
+        }
+
+        source_square = get_lsb_index(bitboard).expect("Guard before should handle this.");
+        let mut quiet_moves = self.bitboard_constants.king_attacks[source_square] & (!self.all_occupancies);
+        let mut attacks = self.bitboard_constants.king_attacks[source_square] & their_occupancies;
+
+
+        // Moves
+        while quiet_moves != 0 {
+            target_square = get_lsb_index(quiet_moves).expect("Guard before should handle this.");
+            println!("{}{} (move)", square_to_coord(source_square), square_to_coord(target_square));
+            quiet_moves = pop_bit(quiet_moves, target_square);
+        }
+
+        // Attacks
+        while attacks != 0 {
+            target_square = get_lsb_index(attacks).expect("Guard before should handle this.");
+            println!("{}{} (attack)", square_to_coord(source_square), square_to_coord(target_square));
+            attacks = pop_bit(attacks, target_square);
+        }
+
+        // Castling
+        if can_castle_short {
+
+            // 1. Make sure squares are empty.
+            let squares_should_be_empty = set_bit(0, king_starting_square + 1) | set_bit(0, king_starting_square + 2);
+
+            // 2. Make sure intermediary square is not attacked. Our final check for pins will handle checking the destination square.
+            let is_intermediary_square_attacked = self.is_square_attacked(king_starting_square + 1, their_color);
+
+            // If both conditions are met, we can castle.
+            target_square = king_starting_square + 2;
+            if (squares_should_be_empty & self.all_occupancies) == 0 && !is_intermediary_square_attacked {
+                println!("{}{} (castle short)", square_to_coord(source_square), square_to_coord(target_square));
+            }
+        }
+
+        if can_castle_long {
+
+            // 1. Make sure squares are empty.
+            let squares_should_be_empty = set_bit(0, king_starting_square - 1) | set_bit(0, king_starting_square - 2) | set_bit(0, king_starting_square - 3);
+
+            // 2. Make sure intermediary square is not attacked. Our final check for pins will handle checking the destination square.
+            let is_intermediary_square_attacked = self.is_square_attacked(king_starting_square - 1, their_color);
+
+            // If both conditions are met, we can castle.
+            target_square = king_starting_square - 2;
+            if (squares_should_be_empty & self.all_occupancies) == 0 && !is_intermediary_square_attacked {
+                println!("{}{} (castle long)", square_to_coord(source_square), square_to_coord(target_square));
+            }
+        }
+
     }
 
     pub fn print_legal_moves_pawns(&self) {
