@@ -553,8 +553,48 @@ impl<'a> ChessGame<'a> {
     }
 
     pub fn print_legal_moves(&self) {
-        self.print_legal_moves_king();
+        //self.print_legal_moves_king();
         //self.print_legal_moves_pawns();
+        self.print_legal_moves_knight();
+    }
+
+    pub fn print_legal_moves_knight(&self) {
+        let mut source_square: usize;
+        let mut target_square: usize;
+        let mut knights: u64;
+        let mut quiet_moves: u64;
+        let mut captures: u64;
+        let their_occupancies: u64;
+
+        if self.white_to_move {
+            their_occupancies = self.black_occupancies;
+            knights = self.white_knights;
+        } else {
+            their_occupancies = self.white_occupancies;
+            knights = self.black_knights;
+        }
+
+        while knights != 0 {
+            source_square = get_lsb_index(knights).expect("This should not happen.");
+
+            // Get moves and captures seperately.
+            quiet_moves = self.bitboard_constants.knight_attacks[source_square] & (!self.all_occupancies);
+            captures = self.bitboard_constants.knight_attacks[source_square] & their_occupancies;
+
+            while quiet_moves != 0 {
+                target_square = get_lsb_index(quiet_moves).expect("This should not be empty.");
+                println!("{}{} quiet", square_to_coord(source_square), square_to_coord(target_square));
+                quiet_moves = pop_bit(quiet_moves, target_square);
+            }
+
+            while captures != 0 {
+                target_square = get_lsb_index(captures).expect("This should not be empty.");
+                println!("{}{} capture", square_to_coord(source_square), square_to_coord(target_square));
+                captures = pop_bit(captures, target_square);
+            }
+
+            knights = pop_bit(knights, source_square);
+        }
     }
 
     pub fn print_legal_moves_king(&self) {
