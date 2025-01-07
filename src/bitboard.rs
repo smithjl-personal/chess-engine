@@ -32,6 +32,96 @@ pub const NOT_RANK_1: u64 = 72057594037927935;
 
 */
 
+pub enum CastleSides {
+    Short,
+    Long,
+}
+
+pub struct Move {
+    pub from: usize,
+    pub to: usize,
+
+    pub is_capture: Option<bool>,
+    pub is_check: Option<bool>,
+    pub next_en_pessant_target_coord: Option<usize>,
+    pub pawn_promoting_to: Option<PieceType>,
+    pub castle_side: Option<CastleSides>,
+}
+
+impl Move {
+    pub fn move_to_str(&self) -> String {
+        let extra_char: String = match self.pawn_promoting_to {
+            Some(t) => t.to_char_side_agnostic().to_string(),
+            None => String::from(""),
+        };
+        return format!("{}{}{}", square_to_coord(self.from), square_to_coord(self.to), extra_char);
+    }
+
+    pub fn str_to_move(text: &str) -> Result<Move, String> {
+        if text.len() != 4 && text.len() != 5 {
+            return Err(format!(
+                "Invalid input detected. Expected 4 or 5 chars. Got: `{}`.",
+                text.len()
+            ));
+        }
+
+        let from_coord = str_coord_to_square(&text[..2]);
+        let to_coord = str_coord_to_square(&text[2..4]);
+
+        let from = match from_coord {
+            Ok(c) => c,
+            Err(msg) => return Err(msg),
+        };
+        let to = match to_coord {
+            Ok(c) => c,
+            Err(msg) => return Err(msg),
+        };
+
+        let mut pawn_promoting_to: Option<PieceType> = None;
+        if text.len() == 5 {
+            let promotion_char: char = text.chars().nth(4).unwrap();
+            let parsed_promotion_piece_type: Result<PieceType, String> =
+                PieceType::char_to_piece_type(promotion_char);
+            match parsed_promotion_piece_type {
+                Ok(t) => pawn_promoting_to = Some(t),
+                Err(m) => return Err(m),
+            };
+        }
+
+        let m = Move {
+            from: from,
+            to: to,
+            pawn_promoting_to: pawn_promoting_to,
+
+            // Unknown from this position. We need the bitboards to find this.
+            is_capture: None,
+            is_check: None,
+            next_en_pessant_target_coord: None,
+            castle_side: None,
+        };
+
+        return Ok(m);
+    }
+}
+
+
+// When comparing moves, we only care about the `from` and `to` and promotion. The other fields are for other parts of the program.
+impl PartialEq for Move {
+    fn eq(&self, other: &Self) -> bool {
+        return self.from == other.from
+            && self.to == other.to
+            && self.pawn_promoting_to == other.pawn_promoting_to;
+    }
+}
+
+
+pub enum SliderPieces {
+    Queen,
+    Rook,
+    Bishop,
+}
+
+#[derive(Copy, Clone, PartialEq)]
 pub enum PieceType {
     King,
     Queen,
@@ -42,8 +132,8 @@ pub enum PieceType {
 }
 
 impl PieceType {
-    pub fn to_char(&self, side: Color) -> char {
-        let c = match self {
+    pub fn to_char_side_agnostic(&self) -> char {
+        return match self {
             Self::King => 'k',
             Self::Queen => 'q',
             Self::Rook => 'r',
@@ -51,10 +141,29 @@ impl PieceType {
             Self::Knight => 'n',
             Self::Pawn => 'p',
         };
+    }
+
+    pub fn to_char(&self, side: Color) -> char {
+        let c = self.to_char_side_agnostic();
 
         return match side {
             Color::White => c.to_ascii_uppercase(),
             Color::Black => c,
+        };
+    }
+
+    pub fn char_to_piece_type(c: char) -> Result<PieceType, String> {
+        return match c.to_ascii_lowercase() {
+            'k' => Ok(PieceType::King),
+            'q' => Ok(PieceType::Queen),
+            'r' => Ok(PieceType::Rook),
+            'b' => Ok(PieceType::Bishop),
+            'n' => Ok(PieceType::Knight),
+            'p' => Ok(PieceType::Pawn),
+            _ => Err(format!(
+                "Unexpected character. Cannot convert character `{}` to piece type.",
+                c
+            )),
         };
     }
 }
@@ -552,13 +661,121 @@ impl<'a> ChessGame<'a> {
             | self.get_rook_attacks(square, occupancy);
     }
 
-    pub fn print_legal_moves(&self) {
-        //self.print_legal_moves_king();
-        //self.print_legal_moves_pawns();
-        self.print_legal_moves_knight();
+    // Will generate moves that put self in check.
+    pub fn get_psuedo_legal_moves(&self) -> Vec<Move> {
+        let mut moves: Vec<Move> =  vec![];
+
+        // Get all the moves.
+        moves.append(&mut self.get_moves_slider(SliderPieces::Queen));
+        moves.append(&mut self.get_moves_slider(SliderPieces::Rook));
+        moves.append(&mut self.get_moves_slider(SliderPieces::Bishop));
+        moves.append(&mut self.get_moves_knight());
+        moves.append(&mut self.get_moves_king());
+        moves.append(&mut self.get_moves_pawns());
+
+        return moves;
     }
 
-    pub fn print_legal_moves_knight(&self) {
+    pub fn print_legal_moves(&self) {
+        let moves = self.get_psuedo_legal_moves();
+        for m in moves.iter() {
+            println!("{}", m.move_to_str());
+        }
+    }
+
+    pub fn get_moves_slider(&self, slider_piece_type: SliderPieces) -> Vec<Move> {
+        let mut moves: Vec<Move> = vec![];
+        let mut source_square: usize;
+        let mut target_square: usize;
+        let mut slider_pieces: u64;
+        let mut slider_piece_attacks: u64;
+        let mut quiet_moves: u64;
+        let mut captures: u64;
+        let their_occupancies: u64;
+
+        if self.white_to_move {
+            their_occupancies = self.black_occupancies;
+            match slider_piece_type {
+                SliderPieces::Queen => {
+                    slider_pieces = self.white_queens;
+                }
+                SliderPieces::Rook => {
+                    slider_pieces = self.white_rooks;
+                }
+                SliderPieces::Bishop => {
+                    slider_pieces = self.white_bishops;
+                }
+            }
+        } else {
+            their_occupancies = self.white_occupancies;
+            match slider_piece_type {
+                SliderPieces::Queen => {
+                    slider_pieces = self.black_queens;
+                }
+                SliderPieces::Rook => {
+                    slider_pieces = self.black_rooks;
+                }
+                SliderPieces::Bishop => {
+                    slider_pieces = self.black_bishops;
+                }
+            }
+        }
+
+        while slider_pieces != 0 {
+            source_square = get_lsb_index(slider_pieces).expect("This should not happen.");
+
+            // Get moves and captures seperately.
+            slider_piece_attacks = match slider_piece_type {
+                SliderPieces::Queen => {
+                    self.get_queen_attacks(source_square, self.all_occupancies)
+                }
+                SliderPieces::Rook => {
+                    self.get_rook_attacks(source_square, self.all_occupancies)
+                }
+                SliderPieces::Bishop => {
+                    self.get_bishop_attacks(source_square, self.all_occupancies)
+                }
+            };
+
+            quiet_moves = slider_piece_attacks & (!self.all_occupancies);
+            captures = slider_piece_attacks & their_occupancies;
+
+            while quiet_moves != 0 {
+                target_square = get_lsb_index(quiet_moves).expect("This should not be empty.");
+                moves.push(Move {
+                    from: source_square,
+                    to: target_square,
+                    is_capture: Some(false),
+                    is_check: None,
+                    next_en_pessant_target_coord: None,
+                    pawn_promoting_to: None,
+                    castle_side: None,
+                });
+                quiet_moves = pop_bit(quiet_moves, target_square);
+            }
+
+            while captures != 0 {
+                target_square = get_lsb_index(captures).expect("This should not be empty.");
+                moves.push(Move {
+                    from: source_square,
+                    to: target_square,
+                    is_capture: Some(true),
+                    is_check: None,
+                    next_en_pessant_target_coord: None,
+                    pawn_promoting_to: None,
+                    castle_side: None,
+                });
+                captures = pop_bit(captures, target_square);
+            }
+
+            slider_pieces = pop_bit(slider_pieces, source_square);
+        }
+
+        return moves;
+    }
+
+    pub fn get_moves_knight(&self) -> Vec<Move> {
+        let mut moves: Vec<Move> = vec![];
         let mut source_square: usize;
         let mut target_square: usize;
         let mut knights: u64;
@@ -583,21 +800,40 @@ impl<'a> ChessGame<'a> {
 
             while quiet_moves != 0 {
                 target_square = get_lsb_index(quiet_moves).expect("This should not be empty.");
-                println!("{}{} quiet", square_to_coord(source_square), square_to_coord(target_square));
+                moves.push(Move {
+                    from: source_square,
+                    to: target_square,
+                    is_capture: Some(false),
+                    is_check: None,
+                    next_en_pessant_target_coord: None,
+                    pawn_promoting_to: None,
+                    castle_side: None,
+                });
                 quiet_moves = pop_bit(quiet_moves, target_square);
             }
 
             while captures != 0 {
                 target_square = get_lsb_index(captures).expect("This should not be empty.");
-                println!("{}{} capture", square_to_coord(source_square), square_to_coord(target_square));
+                moves.push(Move {
+                    from: source_square,
+                    to: target_square,
+                    is_capture: Some(true),
+                    is_check: None,
+                    next_en_pessant_target_coord: None,
+                    pawn_promoting_to: None,
+                    castle_side: None,
+                });
                 captures = pop_bit(captures, target_square);
             }
 
             knights = pop_bit(knights, source_square);
         }
+
+        return moves;
     }
 
-    pub fn print_legal_moves_king(&self) {
+    pub fn get_moves_king(&self) -> Vec<Move> {
+        let mut moves: Vec<Move> = vec![];
         let source_square: usize;
         let mut target_square: usize;
         let bitboard: u64;
@@ -624,7 +860,7 @@ impl<'a> ChessGame<'a> {
         }
 
         if bitboard == 0 {
-            return;
+            return moves;
         }
 
         source_square = get_lsb_index(bitboard).expect("Guard before should handle this.");
@@ -635,14 +871,30 @@ impl<'a> ChessGame<'a> {
         // Moves
         while quiet_moves != 0 {
             target_square = get_lsb_index(quiet_moves).expect("Guard before should handle this.");
-            println!("{}{} (move)", square_to_coord(source_square), square_to_coord(target_square));
+            moves.push(Move {
+                from: source_square,
+                to: target_square,
+                is_capture: Some(false),
+                is_check: None,
+                next_en_pessant_target_coord: None,
+                pawn_promoting_to: None,
+                castle_side: None,
+            });
             quiet_moves = pop_bit(quiet_moves, target_square);
         }
 
         // Attacks
         while attacks != 0 {
             target_square = get_lsb_index(attacks).expect("Guard before should handle this.");
-            println!("{}{} (attack)", square_to_coord(source_square), square_to_coord(target_square));
+            moves.push(Move {
+                from: source_square,
+                to: target_square,
+                is_capture: Some(true),
+                is_check: None,
+                next_en_pessant_target_coord: None,
+                pawn_promoting_to: None,
+                castle_side: None,
+            });
             attacks = pop_bit(attacks, target_square);
         }
 
@@ -658,7 +910,15 @@ impl<'a> ChessGame<'a> {
             // If both conditions are met, we can castle.
             target_square = king_starting_square + 2;
             if (squares_should_be_empty & self.all_occupancies) == 0 && !is_intermediary_square_attacked {
-                println!("{}{} (castle short)", square_to_coord(source_square), square_to_coord(target_square));
+                moves.push(Move {
+                    from: source_square,
+                    to: target_square,
+                    is_capture: Some(false),
+                    is_check: None,
+                    next_en_pessant_target_coord: None,
+                    pawn_promoting_to: None,
+                    castle_side: Some(CastleSides::Short),
+                });
             }
         }
 
@@ -673,13 +933,23 @@ impl<'a> ChessGame<'a> {
             // If both conditions are met, we can castle.
             target_square = king_starting_square - 2;
             if (squares_should_be_empty & self.all_occupancies) == 0 && !is_intermediary_square_attacked {
-                println!("{}{} (castle long)", square_to_coord(source_square), square_to_coord(target_square));
+                moves.push(Move {
+                    from: source_square,
+                    to: target_square,
+                    is_capture: Some(false),
+                    is_check: None,
+                    next_en_pessant_target_coord: None,
+                    pawn_promoting_to: None,
+                    castle_side: Some(CastleSides::Long),
+                });
             }
         }
 
+        return moves;
     }
 
-    pub fn print_legal_moves_pawns(&self) {
+    pub fn get_moves_pawns(&self) -> Vec<Move> {
+        let mut moves: Vec<Move> = vec![];
         let mut source_square: usize;
         let mut target_square: usize;
 
@@ -723,13 +993,53 @@ impl<'a> ChessGame<'a> {
 
                 // Check for promotions (no capture).
                 if target_square >= promotion_rank_lower && target_square <= promotion_rank_upper {
-                    println!("{}{}q", square_to_coord(source_square), square_to_coord(target_square));
-                    println!("{}{}r", square_to_coord(source_square), square_to_coord(target_square));
-                    println!("{}{}b", square_to_coord(source_square), square_to_coord(target_square));
-                    println!("{}{}n", square_to_coord(source_square), square_to_coord(target_square));
+                    moves.push(Move {
+                        from: source_square,
+                        to: target_square,
+                        is_capture: Some(false),
+                        is_check: None,
+                        next_en_pessant_target_coord: None,
+                        pawn_promoting_to: Some(PieceType::Queen),
+                        castle_side: None,
+                    });
+                    moves.push(Move {
+                        from: source_square,
+                        to: target_square,
+                        is_capture: Some(false),
+                        is_check: None,
+                        next_en_pessant_target_coord: None,
+                        pawn_promoting_to: Some(PieceType::Rook),
+                        castle_side: None,
+                    });
+                    moves.push(Move {
+                        from: source_square,
+                        to: target_square,
+                        is_capture: Some(false),
+                        is_check: None,
+                        next_en_pessant_target_coord: None,
+                        pawn_promoting_to: Some(PieceType::Bishop),
+                        castle_side: None,
+                    });
+                    moves.push(Move {
+                        from: source_square,
+                        to: target_square,
+                        is_capture: Some(false),
+                        is_check: None,
+                        next_en_pessant_target_coord: None,
+                        pawn_promoting_to: Some(PieceType::Knight),
+                        castle_side: None,
+                    });
                     
                 } else {
-                    println!("{}{}", square_to_coord(source_square), square_to_coord(target_square));
+                    moves.push(Move {
+                        from: source_square,
+                        to: target_square,
+                        is_capture: Some(false),
+                        is_check: None,
+                        next_en_pessant_target_coord: None,
+                        pawn_promoting_to: None,
+                        castle_side: None,
+                    });
 
                     // Check for the double move.
                     target_square = (source_square as i32 + pawn_move_offset + pawn_move_offset) as usize;
@@ -737,7 +1047,15 @@ impl<'a> ChessGame<'a> {
 
                     // If pawn is on the 2nd rank, it can move two tiles.
                     if source_square >= our_starting_rank_lower && source_square <= our_starting_rank_upper && !is_occupied {
-                        println!("{}{} double move", square_to_coord(source_square), square_to_coord(target_square));
+                        moves.push(Move {
+                            from: source_square,
+                            to: target_square,
+                            is_capture: Some(false),
+                            is_check: None,
+                            next_en_pessant_target_coord: Some((source_square as i32 + pawn_move_offset) as usize),
+                            pawn_promoting_to: None,
+                            castle_side: None,
+                        });
                     }
                 }
             }
@@ -747,12 +1065,52 @@ impl<'a> ChessGame<'a> {
             while attacks != 0 {
                 target_square = get_lsb_index(attacks).expect("Should not be empty.");
                 if target_square >= promotion_rank_lower && target_square <= promotion_rank_upper {
-                    println!("{}{}q capture", square_to_coord(source_square), square_to_coord(target_square));
-                    println!("{}{}r capture", square_to_coord(source_square), square_to_coord(target_square));
-                    println!("{}{}b capture", square_to_coord(source_square), square_to_coord(target_square));
-                    println!("{}{}n capture", square_to_coord(source_square), square_to_coord(target_square));
+                    moves.push(Move {
+                        from: source_square,
+                        to: target_square,
+                        is_capture: Some(true),
+                        is_check: None,
+                        next_en_pessant_target_coord: None,
+                        pawn_promoting_to: Some(PieceType::Queen),
+                        castle_side: None,
+                    });
+                    moves.push(Move {
+                        from: source_square,
+                        to: target_square,
+                        is_capture: Some(true),
+                        is_check: None,
+                        next_en_pessant_target_coord: None,
+                        pawn_promoting_to: Some(PieceType::Rook),
+                        castle_side: None,
+                    });
+                    moves.push(Move {
+                        from: source_square,
+                        to: target_square,
+                        is_capture: Some(true),
+                        is_check: None,
+                        next_en_pessant_target_coord: None,
+                        pawn_promoting_to: Some(PieceType::Bishop),
+                        castle_side: None,
+                    });
+                    moves.push(Move {
+                        from: source_square,
+                        to: target_square,
+                        is_capture: Some(true),
+                        is_check: None,
+                        next_en_pessant_target_coord: None,
+                        pawn_promoting_to: Some(PieceType::Knight),
+                        castle_side: None,
+                    });
                 } else {
-                    println!("{}{} capture", square_to_coord(source_square), square_to_coord(target_square));
+                    moves.push(Move {
+                        from: source_square,
+                        to: target_square,
+                        is_capture: Some(true),
+                        is_check: None,
+                        next_en_pessant_target_coord: None,
+                        pawn_promoting_to: None,
+                        castle_side: None,
+                    });
                 }
                 attacks = pop_bit(attacks, target_square);
             }
@@ -762,7 +1120,15 @@ impl<'a> ChessGame<'a> {
                 Some(s) => {
                     attacks = self.bitboard_constants.pawn_attacks[our_color.idx()][source_square] & set_bit(0, s);
                     if attacks != 0 {
-                        println!("{}{} en-passant", square_to_coord(source_square), square_to_coord(s));
+                        moves.push(Move {
+                            from: source_square,
+                            to: target_square,
+                            is_capture: Some(true),
+                            is_check: None,
+                            next_en_pessant_target_coord: None,
+                            pawn_promoting_to: None,
+                            castle_side: None,
+                        });
                     }
                 }
                 _ => ()
@@ -772,6 +1138,8 @@ impl<'a> ChessGame<'a> {
             // Empty the board! and go next.
             bitboard = pop_bit(bitboard, source_square);
         }
+
+        return moves;
     }
 }
 
