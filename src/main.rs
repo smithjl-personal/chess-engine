@@ -19,7 +19,22 @@ async fn main() {
     let c = bitboard::Constants::new();
     let mut new_game = bitboard::ChessGame::new(&c);
     //let _ = new_game.import_fen(constants::INITIAL_GAME_STATE_FEN);
-    let _ = new_game.import_fen("r2qk2r/5nPP/1N1Bpp2/1pPR3N/1pP1Q3/1P1b1P1p/P5PP/R3K2R w KQkq - 0 1");
+    let _ = new_game.import_fen("r2qk2r/5nPP/3Bpp2/1pPR3N/1pP1Q3/1P1b1P1p/P5PP/R3K2R w KQkq b6 0 1");
     new_game.print_board();
+    // print_bitboard(new_game.all_occupancies);
+
+    let this_move = bitboard::Move {
+        from: bitboard::str_coord_to_square("e1").unwrap(),
+        to: bitboard::str_coord_to_square("c1").unwrap(),
+        is_capture: Some(false),
+        is_check: Some(false),
+        next_en_pessant_target_coord: None,
+        pawn_promoting_to: None,
+        castle_side: Some(bitboard::CastleSides::Long),
+    };
+
+    new_game.make_move(&this_move, false);
+    new_game.print_board();
+    // print_bitboard(new_game.all_occupancies);
     new_game.print_legal_moves();
 }
