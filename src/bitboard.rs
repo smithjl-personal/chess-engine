@@ -1,6 +1,6 @@
 use crate::constants;
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum Color {
     White,
     Black,
@@ -39,25 +39,59 @@ pub enum CastleSides {
     Long,
 }
 
+// Think about if this is the best way to do this...
 #[derive(Copy, Clone, Debug)]
 pub struct Move {
-    pub from: usize,
-    pub to: usize,
+    // Basic data, required
+    pub from_square: usize,
+    pub from_piece_type: Option<PieceType>,
+    pub from_piece_color: Option<Color>,
 
-    pub is_capture: Option<bool>,
-    pub is_check: Option<bool>,
-    pub next_en_pessant_target_coord: Option<usize>,
+    pub to_square: usize,
+    pub to_piece_type: Option<PieceType>, // If not 'None', then this is a capture.
+    pub to_piece_color: Option<PieceType>,
+
+    // En-Passant target tracking.
+    pub last_en_passant_target_coord: Option<usize>,
+    pub next_en_passant_target_coord: Option<usize>,
+
+    // Pawn promotion.
     pub pawn_promoting_to: Option<PieceType>,
+
+    // Castling
     pub castle_side: Option<CastleSides>,
+    pub removes_castling_rights_short: bool,
+    pub removes_castling_rights_long: bool,
+
+    // Populated later, used for move sorting.
+    pub is_check: Option<bool>,
 }
 
 impl Move {
+    pub fn new(from_square: usize, to_square: usize) -> Self {
+        return Move {
+            from_square,
+            from_piece_type: None,
+            from_piece_color: None,
+            to_square,
+            to_piece_type: None,
+            to_piece_color: None,
+            last_en_passant_target_coord: None,
+            next_en_passant_target_coord: None,
+            pawn_promoting_to: None,
+            castle_side: None,
+            removes_castling_rights_short: false,
+            removes_castling_rights_long: false,
+            is_check: None,
+        }
+    }
+
     pub fn move_to_str(&self) -> String {
         let extra_char: String = match self.pawn_promoting_to {
             Some(t) => t.to_char_side_agnostic().to_string(),
             None => String::from(""),
         };
-        return format!("{}{}{}", square_to_coord(self.from), square_to_coord(self.to), extra_char);
+        return format!("{}{}{}", square_to_coord(self.from_square), square_to_coord(self.to_square), extra_char);
     }
 
     pub fn str_to_move(text: &str) -> Result<Move, String> {
@@ -91,17 +125,8 @@ impl Move {
             };
         }
 
-        let m = Move {
-            from: from,
-            to: to,
-            pawn_promoting_to: pawn_promoting_to,
-
-            // Unknown from this position. We need the bitboards to find this.
-            is_capture: None,
-            is_check: None,
-            next_en_pessant_target_coord: None,
-            castle_side: None,
-        };
+        let mut m = Move::new(from, to);
+        m.pawn_promoting_to = pawn_promoting_to;
 
         return Ok(m);
     }
@@ -111,8 +136,8 @@ impl Move {
 // When comparing moves, we only care about the `from` and `to` and promotion. The other fields are for other parts of the program.
 impl PartialEq for Move {
     fn eq(&self, other: &Self) -> bool {
-        return self.from == other.from
-            && self.to == other.to
+        return self.from_square == other.from_square
+            && self.to_square == other.to_square
             && self.pawn_promoting_to == other.pawn_promoting_to;
     }
 }
@@ -667,7 +692,7 @@ impl<'a> ChessGame<'a> {
 
 
     pub fn make_move(&mut self, this_move: &Move, debugging: bool) {
-        let (source_piece_unchecked, source_side_unchecked) = self.get_piece_at_square(this_move.from);
+        let (source_piece_unchecked, source_side_unchecked) = self.get_piece_at_square(this_move.from_square);
         let source_piece = match source_piece_unchecked {
             Some(p) => p,
             None => {
@@ -675,7 +700,7 @@ impl<'a> ChessGame<'a> {
             }
         };
         // Handle generic captures, and en-passant captures.
-        let (target_piece,_) = self.get_piece_at_square(this_move.to);
+        let (target_piece,_) = self.get_piece_at_square(this_move.to_square);
         let our_color = source_side_unchecked.unwrap();
         let their_color = match our_color {
             Color::White => Color::Black,
@@ -694,7 +719,7 @@ impl<'a> ChessGame<'a> {
             Color::White => {
                 match source_piece {
                     PieceType::Pawn => {
-                        self.white_pawns = pop_bit(self.white_pawns, this_move.from);
+                        self.white_pawns = pop_bit(self.white_pawns, this_move.from_square);
 
                         if debugging {
                             println!("Looking at moving our pawns.");
@@ -704,86 +729,92 @@ impl<'a> ChessGame<'a> {
                         match this_move.pawn_promoting_to {
                             Some(piece_promoted_to) => {
                                 match piece_promoted_to {
-                                    PieceType::Queen => self.white_queens = set_bit(self.white_queens, this_move.to),
-                                    PieceType::Rook => self.white_rooks = set_bit(self.white_rooks, this_move.to),
-                                    PieceType::Bishop => self.white_bishops = set_bit(self.white_bishops, this_move.to),
-                                    PieceType::Knight => self.white_knights = set_bit(self.white_knights, this_move.to),
+                                    PieceType::Queen => self.white_queens = set_bit(self.white_queens, this_move.to_square),
+                                    PieceType::Rook => self.white_rooks = set_bit(self.white_rooks, this_move.to_square),
+                                    PieceType::Bishop => self.white_bishops = set_bit(self.white_bishops, this_move.to_square),
+                                    PieceType::Knight => self.white_knights = set_bit(self.white_knights, this_move.to_square),
                                     _ => panic!("Tried to promote to an illegal piece."),
                                 }
                             },
-                            None => self.white_pawns = set_bit(self.white_pawns, this_move.to),
+                            None => self.white_pawns = set_bit(self.white_pawns, this_move.to_square),
                         }
                         
                     },
                     PieceType::Bishop => {
-                        self.white_bishops = pop_bit(self.white_bishops, this_move.from);
-                        self.white_bishops = set_bit(self.white_bishops, this_move.to);
+                        self.white_bishops = pop_bit(self.white_bishops, this_move.from_square);
+                        self.white_bishops = set_bit(self.white_bishops, this_move.to_square);
                     },
                     PieceType::Knight => {
-                        self.white_knights = pop_bit(self.white_knights, this_move.from);
-                        self.white_knights = set_bit(self.white_knights, this_move.to);
+                        self.white_knights = pop_bit(self.white_knights, this_move.from_square);
+                        self.white_knights = set_bit(self.white_knights, this_move.to_square);
                     },
                     PieceType::Rook => {
-                        self.white_rooks = pop_bit(self.white_rooks, this_move.from);
-                        self.white_rooks = set_bit(self.white_rooks, this_move.to);
+                        self.white_rooks = pop_bit(self.white_rooks, this_move.from_square);
+                        self.white_rooks = set_bit(self.white_rooks, this_move.to_square);
                     },
                     PieceType::Queen => {
-                        self.white_queens = pop_bit(self.white_queens, this_move.from);
-                        self.white_queens = set_bit(self.white_queens, this_move.to);
+                        self.white_queens = pop_bit(self.white_queens, this_move.from_square);
+                        self.white_queens = set_bit(self.white_queens, this_move.to_square);
                     },
                     PieceType::King => {
-                        self.white_king = pop_bit(self.white_king, this_move.from);
-                        self.white_king = set_bit(self.white_king, this_move.to);
+                        self.white_king = pop_bit(self.white_king, this_move.from_square);
+                        self.white_king = set_bit(self.white_king, this_move.to_square);
                     },
                 }
 
                 // Update our occupancies.
-                self.white_occupancies = pop_bit(self.white_occupancies, this_move.from);
-                self.white_occupancies = set_bit(self.white_occupancies, this_move.to);
+                self.white_occupancies = pop_bit(self.white_occupancies, this_move.from_square);
+                self.white_occupancies = set_bit(self.white_occupancies, this_move.to_square);
             },
             Color::Black => {
                 match source_piece {
                     PieceType::Pawn => {
-                        self.black_pawns = pop_bit(self.black_pawns, this_move.from);
-                        self.black_pawns = set_bit(self.black_pawns, this_move.to);
+                        self.black_pawns = pop_bit(self.black_pawns, this_move.from_square);
+                        self.black_pawns = set_bit(self.black_pawns, this_move.to_square);
                     },
                     PieceType::Bishop => {
-                        self.black_bishops = pop_bit(self.black_bishops, this_move.from);
-                        self.black_bishops = set_bit(self.black_bishops, this_move.to);
+                        self.black_bishops = pop_bit(self.black_bishops, this_move.from_square);
+                        self.black_bishops = set_bit(self.black_bishops, this_move.to_square);
                     },
                     PieceType::Knight => {
-                        self.black_knights = pop_bit(self.black_knights, this_move.from);
-                        self.black_knights = set_bit(self.black_knights, this_move.to);
+                        self.black_knights = pop_bit(self.black_knights, this_move.from_square);
+                        self.black_knights = set_bit(self.black_knights, this_move.to_square);
                     },
                     PieceType::Rook => {
-                        self.black_rooks = pop_bit(self.black_rooks, this_move.from);
-                        self.black_rooks = set_bit(self.black_rooks, this_move.to);
+                        self.black_rooks = pop_bit(self.black_rooks, this_move.from_square);
+                        self.black_rooks = set_bit(self.black_rooks, this_move.to_square);
                     },
                     PieceType::Queen => {
-                        self.black_queens = pop_bit(self.black_queens, this_move.from);
-                        self.black_queens = set_bit(self.black_queens, this_move.to);
+                        self.black_queens = pop_bit(self.black_queens, this_move.from_square);
+                        self.black_queens = set_bit(self.black_queens, this_move.to_square);
                     },
                     PieceType::King => {
-                        self.black_king = pop_bit(self.black_king, this_move.from);
-                        self.black_king = set_bit(self.black_king, this_move.to);
+                        self.black_king = pop_bit(self.black_king, this_move.from_square);
+                        self.black_king = set_bit(self.black_king, this_move.to_square);
                     },
                 }
 
                 // Update our occupancies.
-                self.black_occupancies = pop_bit(self.black_occupancies, this_move.from);
-                self.black_occupancies = set_bit(self.black_occupancies, this_move.to);
+                self.black_occupancies = pop_bit(self.black_occupancies, this_move.from_square);
+                self.black_occupancies = set_bit(self.black_occupancies, this_move.to_square);
             }
         }
 
         // Update all occupancies, source piece always moves.
-        self.all_occupancies = pop_bit(self.all_occupancies, this_move.from);
-        if this_move.is_capture == Some(false) {
+        self.all_occupancies = pop_bit(self.all_occupancies, this_move.from_square);
+
+        // Figure out if we are capturing.
+        if this_move.to_piece_type.is_none() {
+            panic!("Tried to make a move, but not sure if it was a capture or not. Cannot proceed.");
+        }
+
+        let is_capture = this_move.to_piece_type.is_some();
+        if !is_capture {
             if debugging {
                 println!("This move is not a capture. Add occupancy to destination.");
             }
-            self.all_occupancies = set_bit(self.all_occupancies, this_move.to);
-        } else if this_move.is_capture == Some(true) {
-            
+            self.all_occupancies = set_bit(self.all_occupancies, this_move.to_square);
+        } else {
             match target_piece {
                 Some(piece_on_target_square) => {
                     match their_color {
@@ -791,19 +822,19 @@ impl<'a> ChessGame<'a> {
                         Color::White => {
                             match piece_on_target_square {
                                 PieceType::Pawn => {
-                                    self.white_pawns = pop_bit(self.white_pawns, this_move.to);
+                                    self.white_pawns = pop_bit(self.white_pawns, this_move.to_square);
                                 },
                                 PieceType::Bishop => {
-                                    self.white_bishops = pop_bit(self.white_bishops, this_move.to);
+                                    self.white_bishops = pop_bit(self.white_bishops, this_move.to_square);
                                 },
                                 PieceType::Knight => {
-                                    self.white_knights = pop_bit(self.white_knights, this_move.to);
+                                    self.white_knights = pop_bit(self.white_knights, this_move.to_square);
                                 },
                                 PieceType::Rook => {
-                                    self.white_rooks = pop_bit(self.white_rooks, this_move.to);
+                                    self.white_rooks = pop_bit(self.white_rooks, this_move.to_square);
                                 },
                                 PieceType::Queen => {
-                                    self.white_queens = pop_bit(self.white_queens, this_move.to);
+                                    self.white_queens = pop_bit(self.white_queens, this_move.to_square);
                                 },
                                 PieceType::King => {
                                     panic!("You cannot capture the king.");
@@ -811,7 +842,7 @@ impl<'a> ChessGame<'a> {
                             }
 
                             // Update their occupancies.
-                            self.white_occupancies = pop_bit(self.white_occupancies, this_move.to);
+                            self.white_occupancies = pop_bit(self.white_occupancies, this_move.to_square);
                         },
                         Color::Black => {
                             if debugging {
@@ -819,13 +850,13 @@ impl<'a> ChessGame<'a> {
                             }
                             match piece_on_target_square {
                                 PieceType::Pawn => {
-                                    self.black_pawns = pop_bit(self.black_pawns, this_move.to);
+                                    self.black_pawns = pop_bit(self.black_pawns, this_move.to_square);
                                 },
                                 PieceType::Bishop => {
-                                    self.black_bishops = pop_bit(self.black_bishops, this_move.to);
+                                    self.black_bishops = pop_bit(self.black_bishops, this_move.to_square);
                                 },
                                 PieceType::Knight => {
-                                    self.black_knights = pop_bit(self.black_knights, this_move.to);
+                                    self.black_knights = pop_bit(self.black_knights, this_move.to_square);
                                 },
                                 PieceType::Rook => {
                                     if debugging {
@@ -833,7 +864,7 @@ impl<'a> ChessGame<'a> {
                                         print_bitboard(self.black_rooks);
                                     }
                                     
-                                    self.black_rooks = pop_bit(self.black_rooks, this_move.to);
+                                    self.black_rooks = pop_bit(self.black_rooks, this_move.to_square);
 
                                     if debugging {
                                         println!("After popping black rook.");
@@ -841,7 +872,7 @@ impl<'a> ChessGame<'a> {
                                     }
                                 },
                                 PieceType::Queen => {
-                                    self.black_queens = pop_bit(self.black_queens, this_move.to);
+                                    self.black_queens = pop_bit(self.black_queens, this_move.to_square);
                                 },
                                 PieceType::King => {
                                     panic!("You cannot capture the king.");
@@ -849,7 +880,7 @@ impl<'a> ChessGame<'a> {
                             }
 
                             // Update their occupancies.
-                            self.black_occupancies = pop_bit(self.black_occupancies, this_move.to);
+                            self.black_occupancies = pop_bit(self.black_occupancies, this_move.to_square);
                         }
                     }
                 },
@@ -859,30 +890,28 @@ impl<'a> ChessGame<'a> {
                     if debugging {
                         println!("Handling en-passant capture...");
                     }
-                    self.all_occupancies = set_bit(self.all_occupancies, this_move.to);
+                    self.all_occupancies = set_bit(self.all_occupancies, this_move.to_square);
                     match their_color {
                         Color::White => {
-                            self.white_pawns = pop_bit(self.white_pawns, this_move.to - 8);
-                            self.white_occupancies = pop_bit(self.white_occupancies, this_move.to - 8);
-                            self.all_occupancies = pop_bit(self.all_occupancies, this_move.to - 8);
+                            self.white_pawns = pop_bit(self.white_pawns, this_move.to_square - 8);
+                            self.white_occupancies = pop_bit(self.white_occupancies, this_move.to_square - 8);
+                            self.all_occupancies = pop_bit(self.all_occupancies, this_move.to_square - 8);
                         },
                         Color::Black => {
-                            self.black_pawns = pop_bit(self.black_pawns, this_move.to + 8);
-                            self.black_occupancies = pop_bit(self.black_occupancies, this_move.to + 8);
-                            self.all_occupancies = pop_bit(self.all_occupancies, this_move.to + 8);
+                            self.black_pawns = pop_bit(self.black_pawns, this_move.to_square + 8);
+                            self.black_occupancies = pop_bit(self.black_occupancies, this_move.to_square + 8);
+                            self.all_occupancies = pop_bit(self.all_occupancies, this_move.to_square + 8);
                         },
                     }
                 }
             }
-        } else {
-            panic!("Tried to make a move, but not sure if it was a capture or not. Cannot proceed.");
         }
 
         // Lastly, handle castling.
         match this_move.castle_side {
             None => (),
             Some(side) => {
-                let king_from_position = this_move.from;
+                let king_from_position = this_move.from_square;
                 let rook_from_position = match side {
                     CastleSides::Short => king_from_position + 3,
                     CastleSides::Long => king_from_position - 4,
@@ -929,16 +958,16 @@ impl<'a> ChessGame<'a> {
         if source_piece == PieceType::Rook {
             match our_color {
                 Color::White => {
-                    if this_move.from == 63 {
+                    if this_move.from_square == 63 {
                         self.can_white_castle_short = false;
-                    } else if this_move.from == 56 {
+                    } else if this_move.from_square == 56 {
                         self.can_white_castle_long = false;
                     }
                 },
                 Color::Black => {
-                    if this_move.from == 7 {
+                    if this_move.from_square == 7 {
                         self.can_black_castle_short = false;
-                    } else if this_move.from == 0 {
+                    } else if this_move.from_square == 0 {
                         self.can_black_castle_long = false;
                     }
                 },
@@ -946,7 +975,7 @@ impl<'a> ChessGame<'a> {
         }
 
         // Only needed if we are capturing.
-        self.en_passant_target = this_move.next_en_pessant_target_coord;
+        self.en_passant_target = this_move.next_en_passant_target_coord;
 
         // Important for checking if move is illegal.
         self.white_to_move = !self.white_to_move;
@@ -968,7 +997,8 @@ impl<'a> ChessGame<'a> {
 
     pub fn get_legal_moves(&self) -> Vec<Move> {
         let mut moves: Vec<Move> = vec![];
-        let possible_moves = self.get_psuedo_legal_moves();
+        //let possible_moves = self.get_psuedo_legal_moves();
+        let possible_moves: Vec<Move> = vec![];
         let our_side;
 
         if self.white_to_move {
@@ -990,486 +1020,466 @@ impl<'a> ChessGame<'a> {
     }
 
     // Will generate moves that put self in check.
-    pub fn get_psuedo_legal_moves(&self) -> Vec<Move> {
-        let mut moves: Vec<Move> =  vec![];
+    // pub fn get_psuedo_legal_moves(&self) -> Vec<Move> {
+    //     let mut moves: Vec<Move> =  vec![];
 
-        // Get all the moves.
-        moves.append(&mut self.get_moves_slider(SliderPieces::Queen));
-        moves.append(&mut self.get_moves_slider(SliderPieces::Rook));
-        moves.append(&mut self.get_moves_slider(SliderPieces::Bishop));
-        moves.append(&mut self.get_moves_knight());
-        moves.append(&mut self.get_moves_king());
-        moves.append(&mut self.get_moves_pawns());
+    //     // Get all the moves.
+    //     moves.append(&mut self.get_moves_slider(SliderPieces::Queen));
+    //     moves.append(&mut self.get_moves_slider(SliderPieces::Rook));
+    //     moves.append(&mut self.get_moves_slider(SliderPieces::Bishop));
+    //     moves.append(&mut self.get_moves_knight());
+    //     moves.append(&mut self.get_moves_king());
+    //     moves.append(&mut self.get_moves_pawns());
 
-        return moves;
-    }
+    //     return moves;
+    // }
 
-    pub fn print_legal_moves(&self) {
-        let moves = self.get_legal_moves();
-        for m in moves.iter() {
-            print!("{} ", m.move_to_str());
-        }
-        print!("\n");
-    }
+    // pub fn print_legal_moves(&self) {
+    //     let moves = self.get_legal_moves();
+    //     for m in moves.iter() {
+    //         print!("{} ", m.move_to_str());
+    //     }
+    //     print!("\n");
+    // }
 
-    pub fn get_moves_slider(&self, slider_piece_type: SliderPieces) -> Vec<Move> {
-        let mut moves: Vec<Move> = vec![];
-        let mut source_square: usize;
-        let mut target_square: usize;
-        let mut slider_pieces: u64;
-        let mut slider_piece_attacks: u64;
-        let mut quiet_moves: u64;
-        let mut captures: u64;
-        let their_occupancies: u64;
+    // pub fn get_moves_slider(&self, slider_piece_type: SliderPieces) -> Vec<Move> {
+    //     let mut moves: Vec<Move> = vec![];
+    //     let mut source_square: usize;
+    //     let mut target_square: usize;
+    //     let mut slider_pieces: u64;
+    //     let mut slider_piece_attacks: u64;
+    //     let mut quiet_moves: u64;
+    //     let mut captures: u64;
+    //     let their_occupancies: u64;
 
-        if self.white_to_move {
-            their_occupancies = self.black_occupancies;
-            match slider_piece_type {
-                SliderPieces::Queen => {
-                    slider_pieces = self.white_queens;
-                }
-                SliderPieces::Rook => {
-                    slider_pieces = self.white_rooks;
-                }
-                SliderPieces::Bishop => {
-                    slider_pieces = self.white_bishops;
-                }
-            }
-        } else {
-            their_occupancies = self.white_occupancies;
-            match slider_piece_type {
-                SliderPieces::Queen => {
-                    slider_pieces = self.black_queens;
-                }
-                SliderPieces::Rook => {
-                    slider_pieces = self.black_rooks;
-                }
-                SliderPieces::Bishop => {
-                    slider_pieces = self.black_bishops;
-                }
-            }
-        }
+    //     if self.white_to_move {
+    //         their_occupancies = self.black_occupancies;
+    //         match slider_piece_type {
+    //             SliderPieces::Queen => {
+    //                 slider_pieces = self.white_queens;
+    //             }
+    //             SliderPieces::Rook => {
+    //                 slider_pieces = self.white_rooks;
+    //             }
+    //             SliderPieces::Bishop => {
+    //                 slider_pieces = self.white_bishops;
+    //             }
+    //         }
+    //     } else {
+    //         their_occupancies = self.white_occupancies;
+    //         match slider_piece_type {
+    //             SliderPieces::Queen => {
+    //                 slider_pieces = self.black_queens;
+    //             }
+    //             SliderPieces::Rook => {
+    //                 slider_pieces = self.black_rooks;
+    //             }
+    //             SliderPieces::Bishop => {
+    //                 slider_pieces = self.black_bishops;
+    //             }
+    //         }
+    //     }
 
-        while slider_pieces != 0 {
-            source_square = get_lsb_index(slider_pieces).expect("This should not happen.");
+    //     while slider_pieces != 0 {
+    //         source_square = get_lsb_index(slider_pieces).expect("This should not happen.");
 
-            // Get moves and captures seperately.
-            slider_piece_attacks = match slider_piece_type {
-                SliderPieces::Queen => {
-                    self.get_queen_attacks(source_square, self.all_occupancies)
-                }
-                SliderPieces::Rook => {
-                    self.get_rook_attacks(source_square, self.all_occupancies)
-                }
-                SliderPieces::Bishop => {
-                    self.get_bishop_attacks(source_square, self.all_occupancies)
-                }
-            };
+    //         // Get moves and captures seperately.
+    //         slider_piece_attacks = match slider_piece_type {
+    //             SliderPieces::Queen => {
+    //                 self.get_queen_attacks(source_square, self.all_occupancies)
+    //             }
+    //             SliderPieces::Rook => {
+    //                 self.get_rook_attacks(source_square, self.all_occupancies)
+    //             }
+    //             SliderPieces::Bishop => {
+    //                 self.get_bishop_attacks(source_square, self.all_occupancies)
+    //             }
+    //         };
 
-            quiet_moves = slider_piece_attacks & (!self.all_occupancies);
-            captures = slider_piece_attacks & their_occupancies;
+    //         quiet_moves = slider_piece_attacks & (!self.all_occupancies);
+    //         captures = slider_piece_attacks & their_occupancies;
 
-            while quiet_moves != 0 {
-                target_square = get_lsb_index(quiet_moves).expect("This should not be empty.");
-                moves.push(Move {
-                    from: source_square,
-                    to: target_square,
-                    is_capture: Some(false),
-                    is_check: None,
-                    next_en_pessant_target_coord: None,
-                    pawn_promoting_to: None,
-                    castle_side: None,
-                });
-                quiet_moves = pop_bit(quiet_moves, target_square);
-            }
+    //         while quiet_moves != 0 {
+    //             target_square = get_lsb_index(quiet_moves).expect("This should not be empty.");
+    //             moves.push(Move {
+    //                 from_square: source_square,
+    //                 to_square: target_square,
+    //                 is_check: None,
+    //                 next_en_passant_target_coord: None,
+    //                 pawn_promoting_to: None,
+    //                 castle_side: None,
+    //             });
+    //             quiet_moves = pop_bit(quiet_moves, target_square);
+    //         }
 
-            while captures != 0 {
-                target_square = get_lsb_index(captures).expect("This should not be empty.");
-                moves.push(Move {
-                    from: source_square,
-                    to: target_square,
-                    is_capture: Some(true),
-                    is_check: None,
-                    next_en_pessant_target_coord: None,
-                    pawn_promoting_to: None,
-                    castle_side: None,
-                });
-                captures = pop_bit(captures, target_square);
-            }
+    //         while captures != 0 {
+    //             target_square = get_lsb_index(captures).expect("This should not be empty.");
+    //             moves.push(Move {
+    //                 from_square: source_square,
+    //                 to_square: target_square,
+    //                 is_check: None,
+    //                 next_en_passant_target_coord: None,
+    //                 pawn_promoting_to: None,
+    //                 castle_side: None,
+    //             });
+    //             captures = pop_bit(captures, target_square);
+    //         }
 
-            slider_pieces = pop_bit(slider_pieces, source_square);
-        }
+    //         slider_pieces = pop_bit(slider_pieces, source_square);
+    //     }
 
-        return moves;
-    }
+    //     return moves;
+    // }
 
-    pub fn get_moves_knight(&self) -> Vec<Move> {
-        let mut moves: Vec<Move> = vec![];
-        let mut source_square: usize;
-        let mut target_square: usize;
-        let mut knights: u64;
-        let mut quiet_moves: u64;
-        let mut captures: u64;
-        let their_occupancies: u64;
+    // pub fn get_moves_knight(&self) -> Vec<Move> {
+    //     let mut moves: Vec<Move> = vec![];
+    //     let mut source_square: usize;
+    //     let mut target_square: usize;
+    //     let mut knights: u64;
+    //     let mut quiet_moves: u64;
+    //     let mut captures: u64;
+    //     let their_occupancies: u64;
 
-        if self.white_to_move {
-            their_occupancies = self.black_occupancies;
-            knights = self.white_knights;
-        } else {
-            their_occupancies = self.white_occupancies;
-            knights = self.black_knights;
-        }
+    //     if self.white_to_move {
+    //         their_occupancies = self.black_occupancies;
+    //         knights = self.white_knights;
+    //     } else {
+    //         their_occupancies = self.white_occupancies;
+    //         knights = self.black_knights;
+    //     }
 
-        while knights != 0 {
-            source_square = get_lsb_index(knights).expect("This should not happen.");
+    //     while knights != 0 {
+    //         source_square = get_lsb_index(knights).expect("This should not happen.");
 
-            // Get moves and captures seperately.
-            quiet_moves = self.bitboard_constants.knight_attacks[source_square] & (!self.all_occupancies);
-            captures = self.bitboard_constants.knight_attacks[source_square] & their_occupancies;
+    //         // Get moves and captures seperately.
+    //         quiet_moves = self.bitboard_constants.knight_attacks[source_square] & (!self.all_occupancies);
+    //         captures = self.bitboard_constants.knight_attacks[source_square] & their_occupancies;
 
-            while quiet_moves != 0 {
-                target_square = get_lsb_index(quiet_moves).expect("This should not be empty.");
-                moves.push(Move {
-                    from: source_square,
-                    to: target_square,
-                    is_capture: Some(false),
-                    is_check: None,
-                    next_en_pessant_target_coord: None,
-                    pawn_promoting_to: None,
-                    castle_side: None,
-                });
-                quiet_moves = pop_bit(quiet_moves, target_square);
-            }
+    //         while quiet_moves != 0 {
+    //             target_square = get_lsb_index(quiet_moves).expect("This should not be empty.");
+    //             moves.push(Move {
+    //                 from_square: source_square,
+    //                 to_square: target_square,
+    //                 is_check: None,
+    //                 next_en_passant_target_coord: None,
+    //                 pawn_promoting_to: None,
+    //                 castle_side: None,
+    //             });
+    //             quiet_moves = pop_bit(quiet_moves, target_square);
+    //         }
 
-            while captures != 0 {
-                target_square = get_lsb_index(captures).expect("This should not be empty.");
-                moves.push(Move {
-                    from: source_square,
-                    to: target_square,
-                    is_capture: Some(true),
-                    is_check: None,
-                    next_en_pessant_target_coord: None,
-                    pawn_promoting_to: None,
-                    castle_side: None,
-                });
-                captures = pop_bit(captures, target_square);
-            }
+    //         while captures != 0 {
+    //             target_square = get_lsb_index(captures).expect("This should not be empty.");
+    //             moves.push(Move {
+    //                 from_square: source_square,
+    //                 to_square: target_square,
+    //                 is_check: None,
+    //                 next_en_passant_target_coord: None,
+    //                 pawn_promoting_to: None,
+    //                 castle_side: None,
+    //             });
+    //             captures = pop_bit(captures, target_square);
+    //         }
 
-            knights = pop_bit(knights, source_square);
-        }
+    //         knights = pop_bit(knights, source_square);
+    //     }
 
-        return moves;
-    }
+    //     return moves;
+    // }
 
-    pub fn get_moves_king(&self) -> Vec<Move> {
-        let mut moves: Vec<Move> = vec![];
-        let source_square: usize;
-        let mut target_square: usize;
-        let bitboard: u64;
+    // pub fn get_moves_king(&self) -> Vec<Move> {
+    //     let mut moves: Vec<Move> = vec![];
+    //     let source_square: usize;
+    //     let mut target_square: usize;
+    //     let bitboard: u64;
 
-        let their_color: &Color;
-        let their_occupancies: u64;
-        let can_castle_long: bool;
-        let can_castle_short: bool;
-        let king_starting_square: usize;
-        if self.white_to_move {
-            their_color = &Color::Black;
-            their_occupancies = self.black_occupancies;
-            bitboard = self.white_king;
-            can_castle_short = self.can_white_castle_short;
-            can_castle_long = self.can_white_castle_long;
-            king_starting_square = 60;
-        } else {
-            their_color = &Color::White;
-            their_occupancies = self.white_occupancies;
-            bitboard = self.black_king;
-            can_castle_short = self.can_black_castle_short;
-            can_castle_long = self.can_black_castle_long;
-            king_starting_square = 4;
-        }
+    //     let their_color: &Color;
+    //     let their_occupancies: u64;
+    //     let can_castle_long: bool;
+    //     let can_castle_short: bool;
+    //     let king_starting_square: usize;
+    //     if self.white_to_move {
+    //         their_color = &Color::Black;
+    //         their_occupancies = self.black_occupancies;
+    //         bitboard = self.white_king;
+    //         can_castle_short = self.can_white_castle_short;
+    //         can_castle_long = self.can_white_castle_long;
+    //         king_starting_square = 60;
+    //     } else {
+    //         their_color = &Color::White;
+    //         their_occupancies = self.white_occupancies;
+    //         bitboard = self.black_king;
+    //         can_castle_short = self.can_black_castle_short;
+    //         can_castle_long = self.can_black_castle_long;
+    //         king_starting_square = 4;
+    //     }
 
-        if bitboard == 0 {
-            return moves;
-        }
+    //     if bitboard == 0 {
+    //         return moves;
+    //     }
 
-        source_square = get_lsb_index(bitboard).expect("Guard before should handle this.");
-        let mut quiet_moves = self.bitboard_constants.king_attacks[source_square] & (!self.all_occupancies);
-        let mut attacks = self.bitboard_constants.king_attacks[source_square] & their_occupancies;
+    //     source_square = get_lsb_index(bitboard).expect("Guard before should handle this.");
+    //     let mut quiet_moves = self.bitboard_constants.king_attacks[source_square] & (!self.all_occupancies);
+    //     let mut attacks = self.bitboard_constants.king_attacks[source_square] & their_occupancies;
 
 
-        // Moves
-        while quiet_moves != 0 {
-            target_square = get_lsb_index(quiet_moves).expect("Guard before should handle this.");
-            moves.push(Move {
-                from: source_square,
-                to: target_square,
-                is_capture: Some(false),
-                is_check: None,
-                next_en_pessant_target_coord: None,
-                pawn_promoting_to: None,
-                castle_side: None,
-            });
-            quiet_moves = pop_bit(quiet_moves, target_square);
-        }
+    //     // Moves
+    //     while quiet_moves != 0 {
+    //         target_square = get_lsb_index(quiet_moves).expect("Guard before should handle this.");
+    //         moves.push(Move {
+    //             from_square: source_square,
+    //             to_square: target_square,
+    //             is_check: None,
+    //             next_en_passant_target_coord: None,
+    //             pawn_promoting_to: None,
+    //             castle_side: None,
+    //         });
+    //         quiet_moves = pop_bit(quiet_moves, target_square);
+    //     }
 
-        // Attacks
-        while attacks != 0 {
-            target_square = get_lsb_index(attacks).expect("Guard before should handle this.");
-            moves.push(Move {
-                from: source_square,
-                to: target_square,
-                is_capture: Some(true),
-                is_check: None,
-                next_en_pessant_target_coord: None,
-                pawn_promoting_to: None,
-                castle_side: None,
-            });
-            attacks = pop_bit(attacks, target_square);
-        }
+    //     // Attacks
+    //     while attacks != 0 {
+    //         target_square = get_lsb_index(attacks).expect("Guard before should handle this.");
+    //         moves.push(Move {
+    //             from_square: source_square,
+    //             to_square: target_square,
+    //             is_check: None,
+    //             next_en_passant_target_coord: None,
+    //             pawn_promoting_to: None,
+    //             castle_side: None,
+    //         });
+    //         attacks = pop_bit(attacks, target_square);
+    //     }
 
-        // Castling
-        if can_castle_short {
+    //     // Castling
+    //     if can_castle_short {
 
-            // 1. Make sure squares are empty.
-            let squares_should_be_empty = set_bit(0, king_starting_square + 1) | set_bit(0, king_starting_square + 2);
+    //         // 1. Make sure squares are empty.
+    //         let squares_should_be_empty = set_bit(0, king_starting_square + 1) | set_bit(0, king_starting_square + 2);
 
-            // 2. Make sure intermediary square is not attacked. Our final check for pins will handle checking the destination square.
-            let is_intermediary_square_attacked = self.is_square_attacked(king_starting_square + 1, their_color);
+    //         // 2. Make sure intermediary square is not attacked. Our final check for pins will handle checking the destination square.
+    //         let is_intermediary_square_attacked = self.is_square_attacked(king_starting_square + 1, their_color);
 
-            // If both conditions are met, we can castle.
-            target_square = king_starting_square + 2;
-            if (squares_should_be_empty & self.all_occupancies) == 0 && !is_intermediary_square_attacked {
-                moves.push(Move {
-                    from: source_square,
-                    to: target_square,
-                    is_capture: Some(false),
-                    is_check: None,
-                    next_en_pessant_target_coord: None,
-                    pawn_promoting_to: None,
-                    castle_side: Some(CastleSides::Short),
-                });
-            }
-        }
+    //         // If both conditions are met, we can castle.
+    //         target_square = king_starting_square + 2;
+    //         if (squares_should_be_empty & self.all_occupancies) == 0 && !is_intermediary_square_attacked {
+    //             moves.push(Move {
+    //                 from_square: source_square,
+    //                 to_square: target_square,
+    //                 is_check: None,
+    //                 next_en_passant_target_coord: None,
+    //                 pawn_promoting_to: None,
+    //                 castle_side: Some(CastleSides::Short),
+    //             });
+    //         }
+    //     }
 
-        if can_castle_long {
+    //     if can_castle_long {
 
-            // 1. Make sure squares are empty.
-            let squares_should_be_empty = set_bit(0, king_starting_square - 1) | set_bit(0, king_starting_square - 2) | set_bit(0, king_starting_square - 3);
+    //         // 1. Make sure squares are empty.
+    //         let squares_should_be_empty = set_bit(0, king_starting_square - 1) | set_bit(0, king_starting_square - 2) | set_bit(0, king_starting_square - 3);
 
-            // 2. Make sure intermediary square is not attacked. Our final check for pins will handle checking the destination square.
-            let is_intermediary_square_attacked = self.is_square_attacked(king_starting_square - 1, their_color);
+    //         // 2. Make sure intermediary square is not attacked. Our final check for pins will handle checking the destination square.
+    //         let is_intermediary_square_attacked = self.is_square_attacked(king_starting_square - 1, their_color);
 
-            // If both conditions are met, we can castle.
-            target_square = king_starting_square - 2;
-            if (squares_should_be_empty & self.all_occupancies) == 0 && !is_intermediary_square_attacked {
-                moves.push(Move {
-                    from: source_square,
-                    to: target_square,
-                    is_capture: Some(false),
-                    is_check: None,
-                    next_en_pessant_target_coord: None,
-                    pawn_promoting_to: None,
-                    castle_side: Some(CastleSides::Long),
-                });
-            }
-        }
+    //         // If both conditions are met, we can castle.
+    //         target_square = king_starting_square - 2;
+    //         if (squares_should_be_empty & self.all_occupancies) == 0 && !is_intermediary_square_attacked {
+    //             moves.push(Move {
+    //                 from_square: source_square,
+    //                 to_square: target_square,
+    //                 is_check: None,
+    //                 next_en_passant_target_coord: None,
+    //                 pawn_promoting_to: None,
+    //                 castle_side: Some(CastleSides::Long),
+    //             });
+    //         }
+    //     }
 
-        return moves;
-    }
+    //     return moves;
+    // }
 
-    pub fn get_moves_pawns(&self) -> Vec<Move> {
-        let mut moves: Vec<Move> = vec![];
-        let mut source_square: usize;
-        let mut target_square: usize;
+    // pub fn get_moves_pawns(&self) -> Vec<Move> {
+    //     let mut moves: Vec<Move> = vec![];
+    //     let mut source_square: usize;
+    //     let mut target_square: usize;
 
-        let mut bitboard: u64;
-        let mut attacks: u64;
+    //     let mut bitboard: u64;
+    //     let mut attacks: u64;
 
-        let our_color: Color;
-        let their_occupancies: u64;
-        let pawn_move_offset: i32;
-        let promotion_rank_lower: usize;
-        let promotion_rank_upper: usize;
-        let our_starting_rank_lower: usize;
-        let our_starting_rank_upper: usize;
-        if self.white_to_move {
-            our_color = Color::White;
-            their_occupancies = self.black_occupancies;
-            bitboard = self.white_pawns;
-            pawn_move_offset = -8;
-            promotion_rank_lower = 0;
-            promotion_rank_upper = 7;
-            our_starting_rank_lower = 48;
-            our_starting_rank_upper = 55;
-        } else {
-            our_color = Color::Black;
-            their_occupancies = self.white_occupancies;
-            bitboard = self.black_pawns;
-            pawn_move_offset = 8;
-            promotion_rank_lower = 56;
-            promotion_rank_upper = 63;
-            our_starting_rank_lower = 8;
-            our_starting_rank_upper = 15;
-        }
+    //     let our_color: Color;
+    //     let their_occupancies: u64;
+    //     let pawn_move_offset: i32;
+    //     let promotion_rank_lower: usize;
+    //     let promotion_rank_upper: usize;
+    //     let our_starting_rank_lower: usize;
+    //     let our_starting_rank_upper: usize;
+    //     if self.white_to_move {
+    //         our_color = Color::White;
+    //         their_occupancies = self.black_occupancies;
+    //         bitboard = self.white_pawns;
+    //         pawn_move_offset = -8;
+    //         promotion_rank_lower = 0;
+    //         promotion_rank_upper = 7;
+    //         our_starting_rank_lower = 48;
+    //         our_starting_rank_upper = 55;
+    //     } else {
+    //         our_color = Color::Black;
+    //         their_occupancies = self.white_occupancies;
+    //         bitboard = self.black_pawns;
+    //         pawn_move_offset = 8;
+    //         promotion_rank_lower = 56;
+    //         promotion_rank_upper = 63;
+    //         our_starting_rank_lower = 8;
+    //         our_starting_rank_upper = 15;
+    //     }
 
-        while bitboard != 0 {
-            source_square = get_lsb_index(bitboard).expect("This should not fail.");
+    //     while bitboard != 0 {
+    //         source_square = get_lsb_index(bitboard).expect("This should not fail.");
 
-            // Handles forward moves.
-            target_square = (source_square as i32 + pawn_move_offset) as usize;
-            let mut is_occupied = get_bit(self.all_occupancies, target_square) != 0;
-            if !is_occupied {
+    //         // Handles forward moves.
+    //         target_square = (source_square as i32 + pawn_move_offset) as usize;
+    //         let mut is_occupied = get_bit(self.all_occupancies, target_square) != 0;
+    //         if !is_occupied {
 
-                // Check for promotions (no capture).
-                if target_square >= promotion_rank_lower && target_square <= promotion_rank_upper {
-                    moves.push(Move {
-                        from: source_square,
-                        to: target_square,
-                        is_capture: Some(false),
-                        is_check: None,
-                        next_en_pessant_target_coord: None,
-                        pawn_promoting_to: Some(PieceType::Queen),
-                        castle_side: None,
-                    });
-                    moves.push(Move {
-                        from: source_square,
-                        to: target_square,
-                        is_capture: Some(false),
-                        is_check: None,
-                        next_en_pessant_target_coord: None,
-                        pawn_promoting_to: Some(PieceType::Rook),
-                        castle_side: None,
-                    });
-                    moves.push(Move {
-                        from: source_square,
-                        to: target_square,
-                        is_capture: Some(false),
-                        is_check: None,
-                        next_en_pessant_target_coord: None,
-                        pawn_promoting_to: Some(PieceType::Bishop),
-                        castle_side: None,
-                    });
-                    moves.push(Move {
-                        from: source_square,
-                        to: target_square,
-                        is_capture: Some(false),
-                        is_check: None,
-                        next_en_pessant_target_coord: None,
-                        pawn_promoting_to: Some(PieceType::Knight),
-                        castle_side: None,
-                    });
+    //             // Check for promotions (no capture).
+    //             if target_square >= promotion_rank_lower && target_square <= promotion_rank_upper {
+    //                 moves.push(Move {
+    //                     from_square: source_square,
+    //                     to_square: target_square,
+    //                     is_check: None,
+    //                     next_en_passant_target_coord: None,
+    //                     pawn_promoting_to: Some(PieceType::Queen),
+    //                     castle_side: None,
+    //                 });
+    //                 moves.push(Move {
+    //                     from_square: source_square,
+    //                     to_square: target_square,
+    //                     is_check: None,
+    //                     next_en_passant_target_coord: None,
+    //                     pawn_promoting_to: Some(PieceType::Rook),
+    //                     castle_side: None,
+    //                 });
+    //                 moves.push(Move {
+    //                     from_square: source_square,
+    //                     to_square: target_square,
+    //                     is_check: None,
+    //                     next_en_passant_target_coord: None,
+    //                     pawn_promoting_to: Some(PieceType::Bishop),
+    //                     castle_side: None,
+    //                 });
+    //                 moves.push(Move {
+    //                     from_square: source_square,
+    //                     to_square: target_square,
+    //                     is_check: None,
+    //                     next_en_passant_target_coord: None,
+    //                     pawn_promoting_to: Some(PieceType::Knight),
+    //                     castle_side: None,
+    //                 });
                     
-                } else {
-                    moves.push(Move {
-                        from: source_square,
-                        to: target_square,
-                        is_capture: Some(false),
-                        is_check: None,
-                        next_en_pessant_target_coord: None,
-                        pawn_promoting_to: None,
-                        castle_side: None,
-                    });
+    //             } else {
+    //                 moves.push(Move {
+    //                     from_square: source_square,
+    //                     to_square: target_square,
+    //                     is_check: None,
+    //                     next_en_passant_target_coord: None,
+    //                     pawn_promoting_to: None,
+    //                     castle_side: None,
+    //                 });
 
-                    // Check for the double move.
-                    target_square = (source_square as i32 + pawn_move_offset + pawn_move_offset) as usize;
-                    is_occupied = get_bit(self.all_occupancies, target_square) != 0;
+    //                 // Check for the double move.
+    //                 target_square = (source_square as i32 + pawn_move_offset + pawn_move_offset) as usize;
+    //                 is_occupied = get_bit(self.all_occupancies, target_square) != 0;
 
-                    // If pawn is on the 2nd rank, it can move two tiles.
-                    if source_square >= our_starting_rank_lower && source_square <= our_starting_rank_upper && !is_occupied {
-                        moves.push(Move {
-                            from: source_square,
-                            to: target_square,
-                            is_capture: Some(false),
-                            is_check: None,
-                            next_en_pessant_target_coord: Some((source_square as i32 + pawn_move_offset) as usize),
-                            pawn_promoting_to: None,
-                            castle_side: None,
-                        });
-                    }
-                }
-            }
+    //                 // If pawn is on the 2nd rank, it can move two tiles.
+    //                 if source_square >= our_starting_rank_lower && source_square <= our_starting_rank_upper && !is_occupied {
+    //                     moves.push(Move {
+    //                         from_square: source_square,
+    //                         to_square: target_square,
+    //                         is_check: None,
+    //                         next_en_passant_target_coord: Some((source_square as i32 + pawn_move_offset) as usize),
+    //                         pawn_promoting_to: None,
+    //                         castle_side: None,
+    //                     });
+    //                 }
+    //             }
+    //         }
 
-            // Handles captures (non-en-passant).
-            attacks = self.bitboard_constants.pawn_attacks[our_color.idx()][source_square] & their_occupancies;
-            while attacks != 0 {
-                target_square = get_lsb_index(attacks).expect("Should not be empty.");
-                if target_square >= promotion_rank_lower && target_square <= promotion_rank_upper {
-                    moves.push(Move {
-                        from: source_square,
-                        to: target_square,
-                        is_capture: Some(true),
-                        is_check: None,
-                        next_en_pessant_target_coord: None,
-                        pawn_promoting_to: Some(PieceType::Queen),
-                        castle_side: None,
-                    });
-                    moves.push(Move {
-                        from: source_square,
-                        to: target_square,
-                        is_capture: Some(true),
-                        is_check: None,
-                        next_en_pessant_target_coord: None,
-                        pawn_promoting_to: Some(PieceType::Rook),
-                        castle_side: None,
-                    });
-                    moves.push(Move {
-                        from: source_square,
-                        to: target_square,
-                        is_capture: Some(true),
-                        is_check: None,
-                        next_en_pessant_target_coord: None,
-                        pawn_promoting_to: Some(PieceType::Bishop),
-                        castle_side: None,
-                    });
-                    moves.push(Move {
-                        from: source_square,
-                        to: target_square,
-                        is_capture: Some(true),
-                        is_check: None,
-                        next_en_pessant_target_coord: None,
-                        pawn_promoting_to: Some(PieceType::Knight),
-                        castle_side: None,
-                    });
-                } else {
-                    moves.push(Move {
-                        from: source_square,
-                        to: target_square,
-                        is_capture: Some(true),
-                        is_check: None,
-                        next_en_pessant_target_coord: None,
-                        pawn_promoting_to: None,
-                        castle_side: None,
-                    });
-                }
-                attacks = pop_bit(attacks, target_square);
-            }
+    //         // Handles captures (non-en-passant).
+    //         attacks = self.bitboard_constants.pawn_attacks[our_color.idx()][source_square] & their_occupancies;
+    //         while attacks != 0 {
+    //             target_square = get_lsb_index(attacks).expect("Should not be empty.");
+    //             if target_square >= promotion_rank_lower && target_square <= promotion_rank_upper {
+    //                 moves.push(Move {
+    //                     from_square: source_square,
+    //                     to_square: target_square,
+    //                     is_check: None,
+    //                     next_en_passant_target_coord: None,
+    //                     pawn_promoting_to: Some(PieceType::Queen),
+    //                     castle_side: None,
+    //                 });
+    //                 moves.push(Move {
+    //                     from_square: source_square,
+    //                     to_square: target_square,
+    //                     is_check: None,
+    //                     next_en_passant_target_coord: None,
+    //                     pawn_promoting_to: Some(PieceType::Rook),
+    //                     castle_side: None,
+    //                 });
+    //                 moves.push(Move {
+    //                     from_square: source_square,
+    //                     to_square: target_square,
+    //                     is_check: None,
+    //                     next_en_passant_target_coord: None,
+    //                     pawn_promoting_to: Some(PieceType::Bishop),
+    //                     castle_side: None,
+    //                 });
+    //                 moves.push(Move {
+    //                     from_square: source_square,
+    //                     to_square: target_square,
+    //                     is_check: None,
+    //                     next_en_passant_target_coord: None,
+    //                     pawn_promoting_to: Some(PieceType::Knight),
+    //                     castle_side: None,
+    //                 });
+    //             } else {
+    //                 moves.push(Move {
+    //                     from_square: source_square,
+    //                     to_square: target_square,
+    //                     is_check: None,
+    //                     next_en_passant_target_coord: None,
+    //                     pawn_promoting_to: None,
+    //                     castle_side: None,
+    //                 });
+    //             }
+    //             attacks = pop_bit(attacks, target_square);
+    //         }
 
-            // Handles captures (en-passant)
-            match self.en_passant_target {
-                Some(s) => {
-                    attacks = self.bitboard_constants.pawn_attacks[our_color.idx()][source_square] & set_bit(0, s);
-                    if attacks != 0 {
-                        moves.push(Move {
-                            from: source_square,
-                            to: target_square,
-                            is_capture: Some(true),
-                            is_check: None,
-                            next_en_pessant_target_coord: None,
-                            pawn_promoting_to: None,
-                            castle_side: None,
-                        });
-                    }
-                }
-                _ => ()
-            }
+    //         // Handles captures (en-passant)
+    //         match self.en_passant_target {
+    //             Some(s) => {
+    //                 attacks = self.bitboard_constants.pawn_attacks[our_color.idx()][source_square] & set_bit(0, s);
+    //                 if attacks != 0 {
+    //                     moves.push(Move {
+    //                         from_square: source_square,
+    //                         to_square: target_square,
+    //                         is_check: None,
+    //                         next_en_passant_target_coord: None,
+    //                         pawn_promoting_to: None,
+    //                         castle_side: None,
+    //                     });
+    //                 }
+    //             }
+    //             _ => ()
+    //         }
 
 
-            // Empty the board! and go next.
-            bitboard = pop_bit(bitboard, source_square);
-        }
+    //         // Empty the board! and go next.
+    //         bitboard = pop_bit(bitboard, source_square);
+    //     }
 
-        return moves;
-    }
+    //     return moves;
+    // }
 }
 
 pub fn square_to_coord(square: usize) -> String {
