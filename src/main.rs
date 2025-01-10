@@ -21,6 +21,12 @@ async fn main() {
     //let _ = new_game.import_fen(constants::INITIAL_GAME_STATE_FEN);
     let _ = new_game.import_fen("r2qk2r/5nPP/3Bpp2/1pPR3N/1pP1Q3/1P1b1P1p/P5PP/R3K2R w KQkq b6 0 1");
     new_game.print_board();
+
+    // Test new bitboard logic.
+    let str_square = "a4";
+    let square = bitboard::str_coord_to_square(&str_square).unwrap();
+    let is_attacked = new_game.is_square_attacked(square, &bitboard::Color::White);
+    println!("Is {str_square} attacked? {is_attacked}");
     // print_bitboard(new_game.all_occupancies);
 
     // let this_move = bitboard::Move {

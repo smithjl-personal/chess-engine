@@ -13,6 +13,18 @@ impl Color {
             Color::Black => 1,
         }
     }
+    pub fn piece_bitboard_offset(&self) -> usize {
+        match self {
+            Color::White => 0,
+            Color::Black => 6,
+        }
+    }
+    pub fn occupancy_bitboard_index(&self) -> usize {
+        match self {
+            Color::White => 0,
+            Color::Black => 1,
+        }
+    }
 }
 
 pub const NOT_FILE_A: u64 = 18374403900871474942;
@@ -194,6 +206,31 @@ impl PieceType {
             )),
         };
     }
+
+    pub fn bitboard_index(&self) -> usize {
+        return match self {
+            Self::Pawn => 0,
+            Self::Bishop => 1,
+            Self::Knight => 2,
+            Self::Rook => 3,
+            Self::Queen => 4,
+            Self::King => 5,
+        };
+    }
+
+    pub fn bitboard_index_to_piece_type(i: usize) -> Self {
+        return match i % 6 {
+            0 => Self::Pawn,
+            1 => Self::Bishop,
+            2 => Self::Knight,
+            3 => Self::Rook,
+            4 => Self::Queen,
+            5 => Self::King,
+            _ => {
+                panic!("Something has gone wrong converting bitboard index to piece type.");
+            },
+        };
+    }
 }
 
 pub struct Constants {
@@ -252,26 +289,24 @@ pub struct ChessGame<'a> {
     pub can_black_castle_long: bool,
     pub can_black_castle_short: bool,
 
-    // White Pieces (bitboards)
-    pub white_pawns: u64,
-    pub white_bishops: u64,
-    pub white_rooks: u64,
-    pub white_knights: u64,
-    pub white_queens: u64,
-    pub white_king: u64,
+    /*
+        0 -> white_pawns
+        1 -> white_bishops
+        2 -> white_knights
+        3 -> white_rooks
+        4 -> white_queens
+        5 -> white_kings
+        6 -> black_pawns
+        ...
+    */
+    pub piece_bitboards: [u64; 12],
 
-    // Black Pieces (bitboards)
-    pub black_pawns: u64,
-    pub black_bishops: u64,
-    pub black_rooks: u64,
-    pub black_knights: u64,
-    pub black_queens: u64,
-    pub black_king: u64,
-
-    // Occupancies (bitboards)
-    pub white_occupancies: u64,
-    pub black_occupancies: u64,
-    pub all_occupancies: u64,
+    /*
+        0 -> white_occupancies
+        1 -> black_occupancies
+        2 -> all_occupancies
+    */
+    pub occupancy_bitboards: [u64; 3],
 }
 
 impl<'a> ChessGame<'a> {
@@ -287,45 +322,15 @@ impl<'a> ChessGame<'a> {
             can_black_castle_long: true,
             can_black_castle_short: true,
 
-            white_pawns: 0,
-            white_bishops: 0,
-            white_rooks: 0,
-            white_knights: 0,
-            white_queens: 0,
-            white_king: 0,
-
-            black_pawns: 0,
-            black_bishops: 0,
-            black_rooks: 0,
-            black_knights: 0,
-            black_queens: 0,
-            black_king: 0,
-
-            white_occupancies: 0,
-            black_occupancies: 0,
-            all_occupancies: 0,
+            piece_bitboards: [0; 12],
+            occupancy_bitboards: [0; 3],
         };
     }
 
     // Takes all pieces off the board.
     pub fn clear_board(&mut self) {
-        self.white_pawns = 0;
-        self.white_bishops = 0;
-        self.white_rooks = 0;
-        self.white_knights = 0;
-        self.white_queens = 0;
-        self.white_king = 0;
-
-        self.black_pawns = 0;
-        self.black_bishops = 0;
-        self.black_rooks = 0;
-        self.black_knights = 0;
-        self.black_queens = 0;
-        self.black_king = 0;
-
-        self.white_occupancies = 0;
-        self.black_occupancies = 0;
-        self.all_occupancies = 0;
+        self.piece_bitboards = [0; 12];
+        self.occupancy_bitboards = [0; 3];
     }
 
     pub fn print_board(&self) {
@@ -517,153 +522,90 @@ impl<'a> ChessGame<'a> {
     }
 
     pub fn place_piece_on_board(&mut self, side: Color, piece_type: PieceType, square: usize) {
-        match side {
-            Color::White => {
-                match piece_type {
-                    PieceType::Pawn => self.white_pawns = set_bit(self.white_pawns, square),
-                    PieceType::Bishop => self.white_bishops = set_bit(self.white_bishops, square),
-                    PieceType::Knight => self.white_knights = set_bit(self.white_knights, square),
-                    PieceType::Rook => self.white_rooks = set_bit(self.white_rooks, square),
-                    PieceType::Queen => self.white_queens = set_bit(self.white_queens, square),
-                    PieceType::King => self.white_king = set_bit(self.white_king, square),
-                };
-                self.white_occupancies = set_bit(self.white_occupancies, square);
-            }
-            Color::Black => {
-                match piece_type {
-                    PieceType::Pawn => self.black_pawns = set_bit(self.black_pawns, square),
-                    PieceType::Bishop => self.black_bishops = set_bit(self.black_bishops, square),
-                    PieceType::Knight => self.black_knights = set_bit(self.black_knights, square),
-                    PieceType::Rook => self.black_rooks = set_bit(self.black_rooks, square),
-                    PieceType::Queen => self.black_queens = set_bit(self.black_queens, square),
-                    PieceType::King => self.black_king = set_bit(self.black_king, square),
-                };
-                self.black_occupancies = set_bit(self.black_occupancies, square);
-            }
-        };
 
-        self.all_occupancies = set_bit(self.all_occupancies, square);
+        // Piece bitboard.
+        let piece_bitboard_index = piece_type.bitboard_index() + side.piece_bitboard_offset();
+        self.piece_bitboards[piece_bitboard_index] = set_bit(self.piece_bitboards[piece_bitboard_index], square);
+
+        // Color occupancies.
+        let occupancy_bitboard_index = side.occupancy_bitboard_index();
+        self.occupancy_bitboards[occupancy_bitboard_index] = set_bit(self.occupancy_bitboards[occupancy_bitboard_index], square);
+
+        // All occupancies.
+        self.occupancy_bitboards[2] = set_bit(self.occupancy_bitboards[2], square);
     }
 
     // WARNING: Not efficient function??
     pub fn get_piece_at_square(&self, square: usize) -> (Option<PieceType>, Option<Color>) {
-        let is_occupied = get_bit(self.all_occupancies, square) != 0;
+        let is_occupied = get_bit(self.occupancy_bitboards[2], square) != 0;
         if !is_occupied {
             return (None, None);
         }
 
-        let is_occupied_white = get_bit(self.white_occupancies, square) != 0;
-        let is_occupied_black = get_bit(self.black_occupancies, square) != 0;
+        let is_occupied_white = get_bit(self.occupancy_bitboards[0], square) != 0;
+        let is_occupied_black = get_bit(self.occupancy_bitboards[1], square) != 0;
 
+        let piece_color: Color;
         if is_occupied_white {
-            if get_bit(self.white_pawns, square) != 0 {
-                return (Some(PieceType::Pawn), Some(Color::White));
-            } else if get_bit(self.white_bishops, square) != 0 {
-                return (Some(PieceType::Bishop), Some(Color::White));
-            } else if get_bit(self.white_knights, square) != 0 {
-                return (Some(PieceType::Knight), Some(Color::White));
-            } else if get_bit(self.white_rooks, square) != 0 {
-                return (Some(PieceType::Rook), Some(Color::White));
-            } else if get_bit(self.white_queens, square) != 0 {
-                return (Some(PieceType::Queen), Some(Color::White));
-            } else if get_bit(self.white_king, square) != 0 {
-                return (Some(PieceType::King), Some(Color::White));
-            } else {
-                panic!("Something has gone very wrong.");
-            }
+            piece_color = Color::White;
         } else if is_occupied_black {
-            if get_bit(self.black_pawns, square) != 0 {
-                return (Some(PieceType::Pawn), Some(Color::Black));
-            } else if get_bit(self.black_bishops, square) != 0 {
-                return (Some(PieceType::Bishop), Some(Color::Black));
-            } else if get_bit(self.black_knights, square) != 0 {
-                return (Some(PieceType::Knight), Some(Color::Black));
-            } else if get_bit(self.black_rooks, square) != 0 {
-                return (Some(PieceType::Rook), Some(Color::Black));
-            } else if get_bit(self.black_queens, square) != 0 {
-                return (Some(PieceType::Queen), Some(Color::Black));
-            } else if get_bit(self.black_king, square) != 0 {
-                return (Some(PieceType::King), Some(Color::Black));
-            } else {
-                panic!("Something has gone very wrong.");
-            }
+            piece_color = Color::Black;
         } else {
             panic!("Someting has gone very wrong. All occupancies populated, but no piece found.");
         }
+
+        let start_bitboard_index: usize = piece_color.piece_bitboard_offset();
+
+        // Loop over all the piece bitboards until we find the piece we want.
+        for i in start_bitboard_index..start_bitboard_index + 6 {
+            if get_bit(self.piece_bitboards[i], square) != 0 {
+                return (Some(PieceType::bitboard_index_to_piece_type(i)), Some(piece_color));
+            }
+        }
+
+        panic!("Someting has gone very wrong. Looked at all bitboards and could not find a piece.");
     }
 
     // Bitwise operations make this pretty quick.
     pub fn is_square_attacked(&self, square: usize, who_is_attacking: &Color) -> bool {
-        match who_is_attacking {
-            Color::White => {
-                // Pawns.
-                if self.bitboard_constants.pawn_attacks[Color::Black.idx()][square]
-                    & self.white_pawns
-                    != 0
-                {
-                    return true;
-                }
-
-                // Knights.
-                if self.bitboard_constants.knight_attacks[square] & self.white_knights != 0 {
-                    return true;
-                }
-
-                // Bishops.
-                if self.get_bishop_attacks(square, self.all_occupancies) & self.white_bishops != 0 {
-                    return true;
-                }
-
-                // Rooks.
-                if self.get_rook_attacks(square, self.all_occupancies) & self.white_rooks != 0 {
-                    return true;
-                }
-
-                // Queens. (we could speed this up slightly... look here for optimization if needed.)
-                if self.get_queen_attacks(square, self.all_occupancies) & self.white_queens != 0 {
-                    return true;
-                }
-
-                // King.
-                if self.bitboard_constants.king_attacks[square] & self.white_king != 0 {
-                    return true;
-                }
-            }
-            Color::Black => {
-                // Pawns.
-                if self.bitboard_constants.pawn_attacks[Color::White.idx()][square]
-                    & self.black_pawns
-                    != 0
-                {
-                    return true;
-                }
-
-                // Knights.
-                if self.bitboard_constants.knight_attacks[square] & self.black_knights != 0 {
-                    return true;
-                }
-
-                // Bishops.
-                if self.get_bishop_attacks(square, self.all_occupancies) & self.black_bishops != 0 {
-                    return true;
-                }
-
-                // Rooks.
-                if self.get_rook_attacks(square, self.all_occupancies) & self.black_rooks != 0 {
-                    return true;
-                }
-
-                // Queens. (we could speed this up slightly... look here for optimization if needed.)
-                if self.get_queen_attacks(square, self.all_occupancies) & self.black_queens != 0 {
-                    return true;
-                }
-
-                // King.
-                if self.bitboard_constants.king_attacks[square] & self.black_king != 0 {
-                    return true;
-                }
-            }
+        let piece_bitboard_offset = who_is_attacking.piece_bitboard_offset();
+        let all_occupancies = self.occupancy_bitboards[2];
+        let opponent_pawn_attacks_index = match who_is_attacking {
+            Color::White => Color::Black.idx(),
+            Color::Black => Color::White.idx(),
         };
+
+        // Pawns.
+        if self.bitboard_constants.pawn_attacks[opponent_pawn_attacks_index][square]
+            & self.piece_bitboards[0 + piece_bitboard_offset] != 0
+        {
+            return true;
+        }
+
+        // Bishops.
+        if self.get_bishop_attacks(square, all_occupancies) & self.piece_bitboards[1 + piece_bitboard_offset] != 0 {
+            return true;
+        }
+
+        // Knights.
+        if self.bitboard_constants.knight_attacks[square] & self.piece_bitboards[2 + piece_bitboard_offset] != 0 {
+            return true;
+        }
+
+        // Rooks.
+        if self.get_rook_attacks(square, all_occupancies) & self.piece_bitboards[3 + piece_bitboard_offset] != 0 {
+            return true;
+        }
+
+        // Queens. (we could speed this up slightly... look here for optimization if needed.)
+        if self.get_queen_attacks(square, all_occupancies) & self.piece_bitboards[4 + piece_bitboard_offset] != 0 {
+            return true;
+        }
+
+        // King.
+        if self.bitboard_constants.king_attacks[square] & self.piece_bitboards[5 + piece_bitboard_offset] != 0 {
+            return true;
+        }
 
         // No attacks found!
         return false;
@@ -691,303 +633,300 @@ impl<'a> ChessGame<'a> {
     }
 
 
-    pub fn make_move(&mut self, this_move: &Move, debugging: bool) {
-        let (source_piece_unchecked, source_side_unchecked) = self.get_piece_at_square(this_move.from_square);
-        let source_piece = match source_piece_unchecked {
-            Some(p) => p,
-            None => {
-                panic!("Something has gone very wrong.");
-            }
-        };
-        // Handle generic captures, and en-passant captures.
-        let (target_piece,_) = self.get_piece_at_square(this_move.to_square);
-        let our_color = source_side_unchecked.unwrap();
-        let their_color = match our_color {
-            Color::White => Color::Black,
-            Color::Black => Color::White,
-        };
+    // pub fn make_move(&mut self, this_move: &Move, debugging: bool) {
+    //     let (source_piece_unchecked, source_side_unchecked) = self.get_piece_at_square(this_move.from_square);
+    //     let source_piece = match source_piece_unchecked {
+    //         Some(p) => p,
+    //         None => {
+    //             panic!("Something has gone very wrong.");
+    //         }
+    //     };
+    //     // Handle generic captures, and en-passant captures.
+    //     let (target_piece,_) = self.get_piece_at_square(this_move.to_square);
+    //     let our_color = source_side_unchecked.unwrap();
+    //     let their_color = match our_color {
+    //         Color::White => Color::Black,
+    //         Color::Black => Color::White,
+    //     };
 
-        if debugging {
-            println!("Debug output (start function) {:#?}", this_move);
-            println!("Our Color: {:#?}\n Their Color: {:#?}", our_color, their_color);
-        }
+    //     if debugging {
+    //         println!("Debug output (start function) {:#?}", this_move);
+    //         println!("Our Color: {:#?}\n Their Color: {:#?}", our_color, their_color);
+    //     }
 
-        // Remove our piece from it's starting square, and place it in the new spot.
-        // This does not handle castling, and en-passant logic.
-        match our_color {
-            // Move the piece from it's source to the destination.
-            Color::White => {
-                match source_piece {
-                    PieceType::Pawn => {
-                        self.white_pawns = pop_bit(self.white_pawns, this_move.from_square);
+    //     // Remove our piece from it's starting square, and place it in the new spot.
+    //     // This does not handle castling, and en-passant logic.
+    //     match our_color {
+    //         // Move the piece from it's source to the destination.
+    //         Color::White => {
+    //             match source_piece {
+    //                 PieceType::Pawn => {
+    //                     self.white_pawns = pop_bit(self.white_pawns, this_move.from_square);
 
-                        if debugging {
-                            println!("Looking at moving our pawns.");
-                        }
+    //                     if debugging {
+    //                         println!("Looking at moving our pawns.");
+    //                     }
 
-                        // Special logic for pawn promotion.
-                        match this_move.pawn_promoting_to {
-                            Some(piece_promoted_to) => {
-                                match piece_promoted_to {
-                                    PieceType::Queen => self.white_queens = set_bit(self.white_queens, this_move.to_square),
-                                    PieceType::Rook => self.white_rooks = set_bit(self.white_rooks, this_move.to_square),
-                                    PieceType::Bishop => self.white_bishops = set_bit(self.white_bishops, this_move.to_square),
-                                    PieceType::Knight => self.white_knights = set_bit(self.white_knights, this_move.to_square),
-                                    _ => panic!("Tried to promote to an illegal piece."),
-                                }
-                            },
-                            None => self.white_pawns = set_bit(self.white_pawns, this_move.to_square),
-                        }
+    //                     // Special logic for pawn promotion.
+    //                     match this_move.pawn_promoting_to {
+    //                         Some(piece_promoted_to) => {
+    //                             match piece_promoted_to {
+    //                                 PieceType::Queen => self.white_queens = set_bit(self.white_queens, this_move.to_square),
+    //                                 PieceType::Rook => self.white_rooks = set_bit(self.white_rooks, this_move.to_square),
+    //                                 PieceType::Bishop => self.white_bishops = set_bit(self.white_bishops, this_move.to_square),
+    //                                 PieceType::Knight => self.white_knights = set_bit(self.white_knights, this_move.to_square),
+    //                                 _ => panic!("Tried to promote to an illegal piece."),
+    //                             }
+    //                         },
+    //                         None => self.white_pawns = set_bit(self.white_pawns, this_move.to_square),
+    //                     }
                         
-                    },
-                    PieceType::Bishop => {
-                        self.white_bishops = pop_bit(self.white_bishops, this_move.from_square);
-                        self.white_bishops = set_bit(self.white_bishops, this_move.to_square);
-                    },
-                    PieceType::Knight => {
-                        self.white_knights = pop_bit(self.white_knights, this_move.from_square);
-                        self.white_knights = set_bit(self.white_knights, this_move.to_square);
-                    },
-                    PieceType::Rook => {
-                        self.white_rooks = pop_bit(self.white_rooks, this_move.from_square);
-                        self.white_rooks = set_bit(self.white_rooks, this_move.to_square);
-                    },
-                    PieceType::Queen => {
-                        self.white_queens = pop_bit(self.white_queens, this_move.from_square);
-                        self.white_queens = set_bit(self.white_queens, this_move.to_square);
-                    },
-                    PieceType::King => {
-                        self.white_king = pop_bit(self.white_king, this_move.from_square);
-                        self.white_king = set_bit(self.white_king, this_move.to_square);
-                    },
-                }
+    //                 },
+    //                 PieceType::Bishop => {
+    //                     self.white_bishops = pop_bit(self.white_bishops, this_move.from_square);
+    //                     self.white_bishops = set_bit(self.white_bishops, this_move.to_square);
+    //                 },
+    //                 PieceType::Knight => {
+    //                     self.white_knights = pop_bit(self.white_knights, this_move.from_square);
+    //                     self.white_knights = set_bit(self.white_knights, this_move.to_square);
+    //                 },
+    //                 PieceType::Rook => {
+    //                     self.white_rooks = pop_bit(self.white_rooks, this_move.from_square);
+    //                     self.white_rooks = set_bit(self.white_rooks, this_move.to_square);
+    //                 },
+    //                 PieceType::Queen => {
+    //                     self.white_queens = pop_bit(self.white_queens, this_move.from_square);
+    //                     self.white_queens = set_bit(self.white_queens, this_move.to_square);
+    //                 },
+    //                 PieceType::King => {
+    //                     self.white_king = pop_bit(self.white_king, this_move.from_square);
+    //                     self.white_king = set_bit(self.white_king, this_move.to_square);
+    //                 },
+    //             }
 
-                // Update our occupancies.
-                self.white_occupancies = pop_bit(self.white_occupancies, this_move.from_square);
-                self.white_occupancies = set_bit(self.white_occupancies, this_move.to_square);
-            },
-            Color::Black => {
-                match source_piece {
-                    PieceType::Pawn => {
-                        self.black_pawns = pop_bit(self.black_pawns, this_move.from_square);
-                        self.black_pawns = set_bit(self.black_pawns, this_move.to_square);
-                    },
-                    PieceType::Bishop => {
-                        self.black_bishops = pop_bit(self.black_bishops, this_move.from_square);
-                        self.black_bishops = set_bit(self.black_bishops, this_move.to_square);
-                    },
-                    PieceType::Knight => {
-                        self.black_knights = pop_bit(self.black_knights, this_move.from_square);
-                        self.black_knights = set_bit(self.black_knights, this_move.to_square);
-                    },
-                    PieceType::Rook => {
-                        self.black_rooks = pop_bit(self.black_rooks, this_move.from_square);
-                        self.black_rooks = set_bit(self.black_rooks, this_move.to_square);
-                    },
-                    PieceType::Queen => {
-                        self.black_queens = pop_bit(self.black_queens, this_move.from_square);
-                        self.black_queens = set_bit(self.black_queens, this_move.to_square);
-                    },
-                    PieceType::King => {
-                        self.black_king = pop_bit(self.black_king, this_move.from_square);
-                        self.black_king = set_bit(self.black_king, this_move.to_square);
-                    },
-                }
+    //             // Update our occupancies.
+    //             self.white_occupancies = pop_bit(self.white_occupancies, this_move.from_square);
+    //             self.white_occupancies = set_bit(self.white_occupancies, this_move.to_square);
+    //         },
+    //         Color::Black => {
+    //             match source_piece {
+    //                 PieceType::Pawn => {
+    //                     self.black_pawns = pop_bit(self.black_pawns, this_move.from_square);
+    //                     self.black_pawns = set_bit(self.black_pawns, this_move.to_square);
+    //                 },
+    //                 PieceType::Bishop => {
+    //                     self.black_bishops = pop_bit(self.black_bishops, this_move.from_square);
+    //                     self.black_bishops = set_bit(self.black_bishops, this_move.to_square);
+    //                 },
+    //                 PieceType::Knight => {
+    //                     self.black_knights = pop_bit(self.black_knights, this_move.from_square);
+    //                     self.black_knights = set_bit(self.black_knights, this_move.to_square);
+    //                 },
+    //                 PieceType::Rook => {
+    //                     self.black_rooks = pop_bit(self.black_rooks, this_move.from_square);
+    //                     self.black_rooks = set_bit(self.black_rooks, this_move.to_square);
+    //                 },
+    //                 PieceType::Queen => {
+    //                     self.black_queens = pop_bit(self.black_queens, this_move.from_square);
+    //                     self.black_queens = set_bit(self.black_queens, this_move.to_square);
+    //                 },
+    //                 PieceType::King => {
+    //                     self.black_king = pop_bit(self.black_king, this_move.from_square);
+    //                     self.black_king = set_bit(self.black_king, this_move.to_square);
+    //                 },
+    //             }
 
-                // Update our occupancies.
-                self.black_occupancies = pop_bit(self.black_occupancies, this_move.from_square);
-                self.black_occupancies = set_bit(self.black_occupancies, this_move.to_square);
-            }
-        }
+    //             // Update our occupancies.
+    //             self.black_occupancies = pop_bit(self.black_occupancies, this_move.from_square);
+    //             self.black_occupancies = set_bit(self.black_occupancies, this_move.to_square);
+    //         }
+    //     }
 
-        // Update all occupancies, source piece always moves.
-        self.all_occupancies = pop_bit(self.all_occupancies, this_move.from_square);
+    //     // Update all occupancies, source piece always moves.
+    //     self.all_occupancies = pop_bit(self.all_occupancies, this_move.from_square);
 
-        // Figure out if we are capturing.
-        if this_move.to_piece_type.is_none() {
-            panic!("Tried to make a move, but not sure if it was a capture or not. Cannot proceed.");
-        }
+    //     // Figure out if we are capturing.
+    //     if this_move.to_piece_type.is_none() {
+    //         panic!("Tried to make a move, but not sure if it was a capture or not. Cannot proceed.");
+    //     }
 
-        let is_capture = this_move.to_piece_type.is_some();
-        if !is_capture {
-            if debugging {
-                println!("This move is not a capture. Add occupancy to destination.");
-            }
-            self.all_occupancies = set_bit(self.all_occupancies, this_move.to_square);
-        } else {
-            match target_piece {
-                Some(piece_on_target_square) => {
-                    match their_color {
-                        // Move the piece from it's source to the destination.
-                        Color::White => {
-                            match piece_on_target_square {
-                                PieceType::Pawn => {
-                                    self.white_pawns = pop_bit(self.white_pawns, this_move.to_square);
-                                },
-                                PieceType::Bishop => {
-                                    self.white_bishops = pop_bit(self.white_bishops, this_move.to_square);
-                                },
-                                PieceType::Knight => {
-                                    self.white_knights = pop_bit(self.white_knights, this_move.to_square);
-                                },
-                                PieceType::Rook => {
-                                    self.white_rooks = pop_bit(self.white_rooks, this_move.to_square);
-                                },
-                                PieceType::Queen => {
-                                    self.white_queens = pop_bit(self.white_queens, this_move.to_square);
-                                },
-                                PieceType::King => {
-                                    panic!("You cannot capture the king.");
-                                },
-                            }
+    //     let is_capture = this_move.to_piece_type.is_some();
+    //     if !is_capture {
+    //         if debugging {
+    //             println!("This move is not a capture. Add occupancy to destination.");
+    //         }
+    //         self.all_occupancies = set_bit(self.all_occupancies, this_move.to_square);
+    //     } else {
+    //         match target_piece {
+    //             Some(piece_on_target_square) => {
+    //                 match their_color {
+    //                     // Move the piece from it's source to the destination.
+    //                     Color::White => {
+    //                         match piece_on_target_square {
+    //                             PieceType::Pawn => {
+    //                                 self.white_pawns = pop_bit(self.white_pawns, this_move.to_square);
+    //                             },
+    //                             PieceType::Bishop => {
+    //                                 self.white_bishops = pop_bit(self.white_bishops, this_move.to_square);
+    //                             },
+    //                             PieceType::Knight => {
+    //                                 self.white_knights = pop_bit(self.white_knights, this_move.to_square);
+    //                             },
+    //                             PieceType::Rook => {
+    //                                 self.white_rooks = pop_bit(self.white_rooks, this_move.to_square);
+    //                             },
+    //                             PieceType::Queen => {
+    //                                 self.white_queens = pop_bit(self.white_queens, this_move.to_square);
+    //                             },
+    //                             PieceType::King => {
+    //                                 panic!("You cannot capture the king.");
+    //                             },
+    //                         }
 
-                            // Update their occupancies.
-                            self.white_occupancies = pop_bit(self.white_occupancies, this_move.to_square);
-                        },
-                        Color::Black => {
-                            if debugging {
-                                println!("Handling capture. Their color is black. Piece on their square is: {:#?}", piece_on_target_square);
-                            }
-                            match piece_on_target_square {
-                                PieceType::Pawn => {
-                                    self.black_pawns = pop_bit(self.black_pawns, this_move.to_square);
-                                },
-                                PieceType::Bishop => {
-                                    self.black_bishops = pop_bit(self.black_bishops, this_move.to_square);
-                                },
-                                PieceType::Knight => {
-                                    self.black_knights = pop_bit(self.black_knights, this_move.to_square);
-                                },
-                                PieceType::Rook => {
-                                    if debugging {
-                                        println!("Before popping black rook.");
-                                        print_bitboard(self.black_rooks);
-                                    }
+    //                         // Update their occupancies.
+    //                         self.white_occupancies = pop_bit(self.white_occupancies, this_move.to_square);
+    //                     },
+    //                     Color::Black => {
+    //                         if debugging {
+    //                             println!("Handling capture. Their color is black. Piece on their square is: {:#?}", piece_on_target_square);
+    //                         }
+    //                         match piece_on_target_square {
+    //                             PieceType::Pawn => {
+    //                                 self.black_pawns = pop_bit(self.black_pawns, this_move.to_square);
+    //                             },
+    //                             PieceType::Bishop => {
+    //                                 self.black_bishops = pop_bit(self.black_bishops, this_move.to_square);
+    //                             },
+    //                             PieceType::Knight => {
+    //                                 self.black_knights = pop_bit(self.black_knights, this_move.to_square);
+    //                             },
+    //                             PieceType::Rook => {
+    //                                 if debugging {
+    //                                     println!("Before popping black rook.");
+    //                                     print_bitboard(self.black_rooks);
+    //                                 }
                                     
-                                    self.black_rooks = pop_bit(self.black_rooks, this_move.to_square);
+    //                                 self.black_rooks = pop_bit(self.black_rooks, this_move.to_square);
 
-                                    if debugging {
-                                        println!("After popping black rook.");
-                                        print_bitboard(self.black_rooks);
-                                    }
-                                },
-                                PieceType::Queen => {
-                                    self.black_queens = pop_bit(self.black_queens, this_move.to_square);
-                                },
-                                PieceType::King => {
-                                    panic!("You cannot capture the king.");
-                                },
-                            }
+    //                                 if debugging {
+    //                                     println!("After popping black rook.");
+    //                                     print_bitboard(self.black_rooks);
+    //                                 }
+    //                             },
+    //                             PieceType::Queen => {
+    //                                 self.black_queens = pop_bit(self.black_queens, this_move.to_square);
+    //                             },
+    //                             PieceType::King => {
+    //                                 panic!("You cannot capture the king.");
+    //                             },
+    //                         }
 
-                            // Update their occupancies.
-                            self.black_occupancies = pop_bit(self.black_occupancies, this_move.to_square);
-                        }
-                    }
-                },
+    //                         // Update their occupancies.
+    //                         self.black_occupancies = pop_bit(self.black_occupancies, this_move.to_square);
+    //                     }
+    //                 }
+    //             },
 
-                // This is an en-passant capture. Treat it as such.
-                None => {
-                    if debugging {
-                        println!("Handling en-passant capture...");
-                    }
-                    self.all_occupancies = set_bit(self.all_occupancies, this_move.to_square);
-                    match their_color {
-                        Color::White => {
-                            self.white_pawns = pop_bit(self.white_pawns, this_move.to_square - 8);
-                            self.white_occupancies = pop_bit(self.white_occupancies, this_move.to_square - 8);
-                            self.all_occupancies = pop_bit(self.all_occupancies, this_move.to_square - 8);
-                        },
-                        Color::Black => {
-                            self.black_pawns = pop_bit(self.black_pawns, this_move.to_square + 8);
-                            self.black_occupancies = pop_bit(self.black_occupancies, this_move.to_square + 8);
-                            self.all_occupancies = pop_bit(self.all_occupancies, this_move.to_square + 8);
-                        },
-                    }
-                }
-            }
-        }
+    //             // This is an en-passant capture. Treat it as such.
+    //             None => {
+    //                 if debugging {
+    //                     println!("Handling en-passant capture...");
+    //                 }
+    //                 self.all_occupancies = set_bit(self.all_occupancies, this_move.to_square);
+    //                 match their_color {
+    //                     Color::White => {
+    //                         self.white_pawns = pop_bit(self.white_pawns, this_move.to_square - 8);
+    //                         self.white_occupancies = pop_bit(self.white_occupancies, this_move.to_square - 8);
+    //                         self.all_occupancies = pop_bit(self.all_occupancies, this_move.to_square - 8);
+    //                     },
+    //                     Color::Black => {
+    //                         self.black_pawns = pop_bit(self.black_pawns, this_move.to_square + 8);
+    //                         self.black_occupancies = pop_bit(self.black_occupancies, this_move.to_square + 8);
+    //                         self.all_occupancies = pop_bit(self.all_occupancies, this_move.to_square + 8);
+    //                     },
+    //                 }
+    //             }
+    //         }
+    //     }
 
-        // Lastly, handle castling.
-        match this_move.castle_side {
-            None => (),
-            Some(side) => {
-                let king_from_position = this_move.from_square;
-                let rook_from_position = match side {
-                    CastleSides::Short => king_from_position + 3,
-                    CastleSides::Long => king_from_position - 4,
-                };
-                let rook_to_position = match side {
-                    CastleSides::Short => king_from_position + 1,
-                    CastleSides::Long => king_from_position - 1,
-                };
-                match our_color {
-                    Color::White => {
-                        self.white_rooks = pop_bit(self.white_rooks, rook_from_position);
-                        self.white_rooks = set_bit(self.white_rooks, rook_to_position);
-                        self.white_occupancies = pop_bit(self.white_occupancies, rook_from_position);
-                        self.white_occupancies = set_bit(self.white_occupancies, rook_to_position);
-                    },
-                    Color::Black => {
-                        self.black_rooks = pop_bit(self.black_rooks, rook_from_position);
-                        self.black_rooks = set_bit(self.black_rooks, rook_to_position);
-                        self.black_occupancies = pop_bit(self.black_occupancies, rook_from_position);
-                        self.black_occupancies = set_bit(self.black_occupancies, rook_to_position);
-                    }
-                }
+    //     // Lastly, handle castling.
+    //     match this_move.castle_side {
+    //         None => (),
+    //         Some(side) => {
+    //             let king_from_position = this_move.from_square;
+    //             let rook_from_position = match side {
+    //                 CastleSides::Short => king_from_position + 3,
+    //                 CastleSides::Long => king_from_position - 4,
+    //             };
+    //             let rook_to_position = match side {
+    //                 CastleSides::Short => king_from_position + 1,
+    //                 CastleSides::Long => king_from_position - 1,
+    //             };
+    //             match our_color {
+    //                 Color::White => {
+    //                     self.white_rooks = pop_bit(self.white_rooks, rook_from_position);
+    //                     self.white_rooks = set_bit(self.white_rooks, rook_to_position);
+    //                     self.white_occupancies = pop_bit(self.white_occupancies, rook_from_position);
+    //                     self.white_occupancies = set_bit(self.white_occupancies, rook_to_position);
+    //                 },
+    //                 Color::Black => {
+    //                     self.black_rooks = pop_bit(self.black_rooks, rook_from_position);
+    //                     self.black_rooks = set_bit(self.black_rooks, rook_to_position);
+    //                     self.black_occupancies = pop_bit(self.black_occupancies, rook_from_position);
+    //                     self.black_occupancies = set_bit(self.black_occupancies, rook_to_position);
+    //                 }
+    //             }
 
-                self.all_occupancies = pop_bit(self.all_occupancies, rook_from_position);
-                self.all_occupancies = set_bit(self.all_occupancies, rook_to_position);
-            }
-        }
+    //             self.all_occupancies = pop_bit(self.all_occupancies, rook_from_position);
+    //             self.all_occupancies = set_bit(self.all_occupancies, rook_to_position);
+    //         }
+    //     }
 
 
-        // Forfeiting castling rights.
-        if source_piece == PieceType::King {
-            match our_color {
-                Color::White => {
-                    self.can_white_castle_short = false;
-                    self.can_white_castle_long = false;
-                },
-                Color::Black => {
-                    self.can_black_castle_short = false;
-                    self.can_black_castle_long = false;
-                },
-            }
-        }
+    //     // Forfeiting castling rights.
+    //     if source_piece == PieceType::King {
+    //         match our_color {
+    //             Color::White => {
+    //                 self.can_white_castle_short = false;
+    //                 self.can_white_castle_long = false;
+    //             },
+    //             Color::Black => {
+    //                 self.can_black_castle_short = false;
+    //                 self.can_black_castle_long = false;
+    //             },
+    //         }
+    //     }
 
-        if source_piece == PieceType::Rook {
-            match our_color {
-                Color::White => {
-                    if this_move.from_square == 63 {
-                        self.can_white_castle_short = false;
-                    } else if this_move.from_square == 56 {
-                        self.can_white_castle_long = false;
-                    }
-                },
-                Color::Black => {
-                    if this_move.from_square == 7 {
-                        self.can_black_castle_short = false;
-                    } else if this_move.from_square == 0 {
-                        self.can_black_castle_long = false;
-                    }
-                },
-            }
-        }
+    //     if source_piece == PieceType::Rook {
+    //         match our_color {
+    //             Color::White => {
+    //                 if this_move.from_square == 63 {
+    //                     self.can_white_castle_short = false;
+    //                 } else if this_move.from_square == 56 {
+    //                     self.can_white_castle_long = false;
+    //                 }
+    //             },
+    //             Color::Black => {
+    //                 if this_move.from_square == 7 {
+    //                     self.can_black_castle_short = false;
+    //                 } else if this_move.from_square == 0 {
+    //                     self.can_black_castle_long = false;
+    //                 }
+    //             },
+    //         }
+    //     }
 
-        // Only needed if we are capturing.
-        self.en_passant_target = this_move.next_en_passant_target_coord;
+    //     // Only needed if we are capturing.
+    //     self.en_passant_target = this_move.next_en_passant_target_coord;
 
-        // Important for checking if move is illegal.
-        self.white_to_move = !self.white_to_move;
-    }
+    //     // Important for checking if move is illegal.
+    //     self.white_to_move = !self.white_to_move;
+    // }
 
 
     pub fn is_king_attacked(&self, side_attacked: &Color) -> bool {
-        let king_square = match side_attacked {
-            Color::White => get_lsb_index(self.white_king).expect("King must be on board."),
-            Color::Black => get_lsb_index(self.black_king).expect("King must be on board."),
-        };
-
+        let king_bitboard_index = 5 + side_attacked.piece_bitboard_offset();
+        let king_square = get_lsb_index(self.piece_bitboards[king_bitboard_index]).expect("King must be on board.");
         return match side_attacked {
             Color::White => self.is_square_attacked(king_square, &Color::Black),
             Color::Black => self.is_square_attacked(king_square, &Color::White),
@@ -1010,7 +949,7 @@ impl<'a> ChessGame<'a> {
         // Try the move, drop it if it's illegal.
         for this_move in possible_moves.iter() {
             let mut self_copy = self.clone();
-            self_copy.make_move(this_move, false);
+            //self_copy.make_move(this_move, false);
             if !self_copy.is_king_attacked(our_side) {
                 moves.push(*this_move);
             }
