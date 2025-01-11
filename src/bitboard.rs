@@ -965,7 +965,7 @@ impl<'a> ChessGame<'a> {
         moves.append(&mut self.get_moves_slider(PieceType::Rook));
         moves.append(&mut self.get_moves_slider(PieceType::Bishop));
         moves.append(&mut self.get_moves_knight());
-        // moves.append(&mut self.get_moves_king());
+        moves.append(&mut self.get_moves_king());
         // moves.append(&mut self.get_moves_pawns());
 
         return moves;
@@ -1175,117 +1175,141 @@ impl<'a> ChessGame<'a> {
         return moves;
     }
 
-    // pub fn get_moves_king(&self) -> Vec<Move> {
-    //     let mut moves: Vec<Move> = vec![];
-    //     let source_square: usize;
-    //     let mut target_square: usize;
-    //     let bitboard: u64;
+    pub fn get_moves_king(&self) -> Vec<Move> {
+        let mut moves: Vec<Move> = vec![];
+        let source_square: usize;
+        let mut target_square: usize;
+        let bitboard: u64;
+        let mut to_piece_type: Option<PieceType>;
 
-    //     let their_color: &Color;
-    //     let their_occupancies: u64;
-    //     let can_castle_long: bool;
-    //     let can_castle_short: bool;
-    //     let king_starting_square: usize;
-    //     if self.white_to_move {
-    //         their_color = &Color::Black;
-    //         their_occupancies = self.black_occupancies;
-    //         bitboard = self.white_king;
-    //         can_castle_short = self.can_white_castle_short;
-    //         can_castle_long = self.can_white_castle_long;
-    //         king_starting_square = 60;
-    //     } else {
-    //         their_color = &Color::White;
-    //         their_occupancies = self.white_occupancies;
-    //         bitboard = self.black_king;
-    //         can_castle_short = self.can_black_castle_short;
-    //         can_castle_long = self.can_black_castle_long;
-    //         king_starting_square = 4;
-    //     }
+        let their_color: &Color;
+        let their_occupancies: u64;
+        let can_castle_long: bool;
+        let can_castle_short: bool;
+        let king_starting_square: usize;
+        if self.white_to_move {
+            their_color = &Color::Black;
+            their_occupancies = self.occupancy_bitboards[Color::Black.occupancy_bitboard_index()];
+            bitboard = self.piece_bitboards[Color::White.piece_bitboard_offset() + PieceType::King.bitboard_index()];
+            can_castle_short = self.can_white_castle_short;
+            can_castle_long = self.can_white_castle_long;
+            king_starting_square = 60;
+        } else {
+            their_color = &Color::White;
+            their_occupancies = self.occupancy_bitboards[Color::White.occupancy_bitboard_index()];
+            bitboard = self.piece_bitboards[Color::Black.piece_bitboard_offset() + PieceType::King.bitboard_index()];
+            can_castle_short = self.can_black_castle_short;
+            can_castle_long = self.can_black_castle_long;
+            king_starting_square = 4;
+        }
 
-    //     if bitboard == 0 {
-    //         return moves;
-    //     }
+        if bitboard == 0 {
+            return moves;
+        }
 
-    //     source_square = get_lsb_index(bitboard).expect("Guard before should handle this.");
-    //     let mut quiet_moves = self.bitboard_constants.king_attacks[source_square] & (!self.all_occupancies);
-    //     let mut attacks = self.bitboard_constants.king_attacks[source_square] & their_occupancies;
+        source_square = get_lsb_index(bitboard).expect("Guard before should handle this.");
+        let mut quiet_moves = self.bitboard_constants.king_attacks[source_square] & (!self.occupancy_bitboards[2]);
+        let mut attacks = self.bitboard_constants.king_attacks[source_square] & their_occupancies;
 
 
-    //     // Moves
-    //     while quiet_moves != 0 {
-    //         target_square = get_lsb_index(quiet_moves).expect("Guard before should handle this.");
-    //         moves.push(Move {
-    //             from_square: source_square,
-    //             to_square: target_square,
-    //             is_check: None,
-    //             next_en_passant_target_coord: None,
-    //             pawn_promoting_to: None,
-    //             castle_side: None,
-    //         });
-    //         quiet_moves = pop_bit(quiet_moves, target_square);
-    //     }
+        // Moves
+        while quiet_moves != 0 {
+            target_square = get_lsb_index(quiet_moves).expect("Guard before should handle this.");
+            moves.push(Move {
+                from_square: source_square,
+                from_piece_type: Some(PieceType::King),
+                to_square: target_square,
+                to_piece_type: None,
+                is_check: None,
+                last_en_passant_target_coord: self.en_passant_target,
+                next_en_passant_target_coord: None,
+                pawn_promoting_to: None,
+                castle_side: None,
+                removes_castling_rights_short: can_castle_short,
+                removes_castling_rights_long: can_castle_long,
+            });
+            quiet_moves = pop_bit(quiet_moves, target_square);
+        }
 
-    //     // Attacks
-    //     while attacks != 0 {
-    //         target_square = get_lsb_index(attacks).expect("Guard before should handle this.");
-    //         moves.push(Move {
-    //             from_square: source_square,
-    //             to_square: target_square,
-    //             is_check: None,
-    //             next_en_passant_target_coord: None,
-    //             pawn_promoting_to: None,
-    //             castle_side: None,
-    //         });
-    //         attacks = pop_bit(attacks, target_square);
-    //     }
+        // Attacks
+        while attacks != 0 {
+            target_square = get_lsb_index(attacks).expect("Guard before should handle this.");
+            (to_piece_type, _) = self.get_piece_at_square(target_square);
 
-    //     // Castling
-    //     if can_castle_short {
+            moves.push(Move {
+                from_square: source_square,
+                from_piece_type: Some(PieceType::King),
+                to_square: target_square,
+                to_piece_type: to_piece_type,
+                is_check: None,
+                last_en_passant_target_coord: self.en_passant_target,
+                next_en_passant_target_coord: None,
+                pawn_promoting_to: None,
+                castle_side: None,
+                removes_castling_rights_short: can_castle_short,
+                removes_castling_rights_long: can_castle_long,
+            });
 
-    //         // 1. Make sure squares are empty.
-    //         let squares_should_be_empty = set_bit(0, king_starting_square + 1) | set_bit(0, king_starting_square + 2);
+            attacks = pop_bit(attacks, target_square);
+        }
 
-    //         // 2. Make sure intermediary square is not attacked. Our final check for pins will handle checking the destination square.
-    //         let is_intermediary_square_attacked = self.is_square_attacked(king_starting_square + 1, their_color);
+        // Castling
+        if can_castle_short {
 
-    //         // If both conditions are met, we can castle.
-    //         target_square = king_starting_square + 2;
-    //         if (squares_should_be_empty & self.all_occupancies) == 0 && !is_intermediary_square_attacked {
-    //             moves.push(Move {
-    //                 from_square: source_square,
-    //                 to_square: target_square,
-    //                 is_check: None,
-    //                 next_en_passant_target_coord: None,
-    //                 pawn_promoting_to: None,
-    //                 castle_side: Some(CastleSides::Short),
-    //             });
-    //         }
-    //     }
+            // 1. Make sure squares are empty.
+            let squares_should_be_empty = set_bit(0, king_starting_square + 1) | set_bit(0, king_starting_square + 2);
 
-    //     if can_castle_long {
+            // 2. Make sure intermediary square is not attacked. Our final check for pins will handle checking the destination square.
+            let is_intermediary_square_attacked = self.is_square_attacked(king_starting_square + 1, their_color);
 
-    //         // 1. Make sure squares are empty.
-    //         let squares_should_be_empty = set_bit(0, king_starting_square - 1) | set_bit(0, king_starting_square - 2) | set_bit(0, king_starting_square - 3);
+            // If both conditions are met, we can castle.
+            target_square = king_starting_square + 2;
+            if (squares_should_be_empty & self.occupancy_bitboards[2]) == 0 && !is_intermediary_square_attacked {
+                moves.push(Move {
+                    from_square: source_square,
+                    from_piece_type: Some(PieceType::King),
+                    to_square: target_square,
+                    to_piece_type: None,
+                    is_check: None,
+                    last_en_passant_target_coord: self.en_passant_target,
+                    next_en_passant_target_coord: None,
+                    pawn_promoting_to: None,
+                    castle_side: Some(CastleSides::Short),
+                    removes_castling_rights_short: can_castle_short,
+                    removes_castling_rights_long: can_castle_long,
+                });
+            }
+        }
 
-    //         // 2. Make sure intermediary square is not attacked. Our final check for pins will handle checking the destination square.
-    //         let is_intermediary_square_attacked = self.is_square_attacked(king_starting_square - 1, their_color);
+        if can_castle_long {
 
-    //         // If both conditions are met, we can castle.
-    //         target_square = king_starting_square - 2;
-    //         if (squares_should_be_empty & self.all_occupancies) == 0 && !is_intermediary_square_attacked {
-    //             moves.push(Move {
-    //                 from_square: source_square,
-    //                 to_square: target_square,
-    //                 is_check: None,
-    //                 next_en_passant_target_coord: None,
-    //                 pawn_promoting_to: None,
-    //                 castle_side: Some(CastleSides::Long),
-    //             });
-    //         }
-    //     }
+            // 1. Make sure squares are empty.
+            let squares_should_be_empty = set_bit(0, king_starting_square - 1) | set_bit(0, king_starting_square - 2) | set_bit(0, king_starting_square - 3);
 
-    //     return moves;
-    // }
+            // 2. Make sure intermediary square is not attacked. Our final check for pins will handle checking the destination square.
+            let is_intermediary_square_attacked = self.is_square_attacked(king_starting_square - 1, their_color);
+
+            // If both conditions are met, we can castle.
+            target_square = king_starting_square - 2;
+            if (squares_should_be_empty & self.occupancy_bitboards[2]) == 0 && !is_intermediary_square_attacked {
+                moves.push(Move {
+                    from_square: source_square,
+                    from_piece_type: Some(PieceType::King),
+                    to_square: target_square,
+                    to_piece_type: None,
+                    is_check: None,
+                    last_en_passant_target_coord: self.en_passant_target,
+                    next_en_passant_target_coord: None,
+                    pawn_promoting_to: None,
+                    castle_side: Some(CastleSides::Long),
+                    removes_castling_rights_short: can_castle_short,
+                    removes_castling_rights_long: can_castle_long,
+                });
+            }
+        }
+
+        return moves;
+    }
 
     // pub fn get_moves_pawns(&self) -> Vec<Move> {
     //     let mut moves: Vec<Move> = vec![];
