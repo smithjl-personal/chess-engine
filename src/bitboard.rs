@@ -57,11 +57,9 @@ pub struct Move {
     // Basic data, required
     pub from_square: usize,
     pub from_piece_type: Option<PieceType>,
-    pub from_piece_color: Option<Color>,
 
     pub to_square: usize,
     pub to_piece_type: Option<PieceType>, // If not 'None', then this is a capture.
-    pub to_piece_color: Option<PieceType>,
 
     // En-Passant target tracking.
     pub last_en_passant_target_coord: Option<usize>,
@@ -84,10 +82,8 @@ impl Move {
         return Move {
             from_square,
             from_piece_type: None,
-            from_piece_color: None,
             to_square,
             to_piece_type: None,
-            to_piece_color: None,
             last_en_passant_target_coord: None,
             next_en_passant_target_coord: None,
             pawn_promoting_to: None,
@@ -936,8 +932,7 @@ impl<'a> ChessGame<'a> {
 
     pub fn get_legal_moves(&self) -> Vec<Move> {
         let mut moves: Vec<Move> = vec![];
-        //let possible_moves = self.get_psuedo_legal_moves();
-        let possible_moves: Vec<Move> = vec![];
+        let possible_moves = self.get_psuedo_legal_moves();
         let our_side;
 
         if self.white_to_move {
@@ -946,129 +941,170 @@ impl<'a> ChessGame<'a> {
             our_side = &Color::Black;
         }
 
+        // moves.push(*this_move);
+
         // Try the move, drop it if it's illegal.
-        for this_move in possible_moves.iter() {
-            let mut self_copy = self.clone();
-            //self_copy.make_move(this_move, false);
-            if !self_copy.is_king_attacked(our_side) {
-                moves.push(*this_move);
-            }
-        }
+        // for this_move in possible_moves.iter() {
+        //     let mut self_copy = self.clone();
+        //     self_copy.make_move(this_move, false);
+        //     if !self_copy.is_king_attacked(our_side) {
+        //         moves.push(*this_move);
+        //     }
+        // }
+
+        // return moves;
+        return possible_moves;
+    }
+
+    // Will generate moves that put self in check.
+    pub fn get_psuedo_legal_moves(&self) -> Vec<Move> {
+        let mut moves: Vec<Move> =  vec![];
+
+        // Get all the moves.
+        moves.append(&mut self.get_moves_slider(PieceType::Queen));
+        moves.append(&mut self.get_moves_slider(PieceType::Rook));
+        moves.append(&mut self.get_moves_slider(PieceType::Bishop));
+        // moves.append(&mut self.get_moves_knight());
+        // moves.append(&mut self.get_moves_king());
+        // moves.append(&mut self.get_moves_pawns());
 
         return moves;
     }
 
-    // Will generate moves that put self in check.
-    // pub fn get_psuedo_legal_moves(&self) -> Vec<Move> {
-    //     let mut moves: Vec<Move> =  vec![];
+    pub fn print_legal_moves(&self) {
+        let moves = self.get_legal_moves();
+        for m in moves.iter() {
+            print!("{} ", m.move_to_str());
+        }
+        if moves.len() == 0 {
+            println!("There are no legal moves...");
+        }
+        print!("\n");
+    }
 
-    //     // Get all the moves.
-    //     moves.append(&mut self.get_moves_slider(SliderPieces::Queen));
-    //     moves.append(&mut self.get_moves_slider(SliderPieces::Rook));
-    //     moves.append(&mut self.get_moves_slider(SliderPieces::Bishop));
-    //     moves.append(&mut self.get_moves_knight());
-    //     moves.append(&mut self.get_moves_king());
-    //     moves.append(&mut self.get_moves_pawns());
+    pub fn get_moves_slider(&self, slider_piece_type: PieceType) -> Vec<Move> {
+        let mut moves: Vec<Move> = vec![];
+        let mut source_square: usize;
+        let mut target_square: usize;
+        let mut slider_pieces: u64;
+        let mut slider_piece_attacks: u64;
+        let mut quiet_moves: u64;
+        let mut captures: u64;
+        let mut removes_castling_rights_short: bool;
+        let mut removes_castling_rights_long: bool;
+        let mut to_piece_type: Option<PieceType>;
 
-    //     return moves;
-    // }
+        let all_occupancies: u64 = self.occupancy_bitboards[2];
+        let their_occupancies: u64;
+        let our_piece_bitboard_offset: usize;
+        let rook_square_offset: usize;
 
-    // pub fn print_legal_moves(&self) {
-    //     let moves = self.get_legal_moves();
-    //     for m in moves.iter() {
-    //         print!("{} ", m.move_to_str());
-    //     }
-    //     print!("\n");
-    // }
+        if self.white_to_move {
+            their_occupancies = self.occupancy_bitboards[Color::Black.occupancy_bitboard_index()];
+            our_piece_bitboard_offset = Color::White.piece_bitboard_offset();
+            rook_square_offset = 56;
+        } else {
+            their_occupancies = self.occupancy_bitboards[Color::White.occupancy_bitboard_index()];
+            our_piece_bitboard_offset = Color::Black.piece_bitboard_offset();
+            rook_square_offset = 0;
+        }
 
-    // pub fn get_moves_slider(&self, slider_piece_type: SliderPieces) -> Vec<Move> {
-    //     let mut moves: Vec<Move> = vec![];
-    //     let mut source_square: usize;
-    //     let mut target_square: usize;
-    //     let mut slider_pieces: u64;
-    //     let mut slider_piece_attacks: u64;
-    //     let mut quiet_moves: u64;
-    //     let mut captures: u64;
-    //     let their_occupancies: u64;
+        slider_pieces = match slider_piece_type {
+            PieceType::Queen => {
+                self.piece_bitboards[our_piece_bitboard_offset + PieceType::Queen.bitboard_index()]
+            }
+            PieceType::Rook => {
+                self.piece_bitboards[our_piece_bitboard_offset + PieceType::Rook.bitboard_index()]
+            }
+            PieceType::Bishop => {
+                self.piece_bitboards[our_piece_bitboard_offset + PieceType::Bishop.bitboard_index()]
+            }
+            _ => {
+                panic!("Attempted to get slider piece moves for non-slider piece.");
+            }
+        };
 
-    //     if self.white_to_move {
-    //         their_occupancies = self.black_occupancies;
-    //         match slider_piece_type {
-    //             SliderPieces::Queen => {
-    //                 slider_pieces = self.white_queens;
-    //             }
-    //             SliderPieces::Rook => {
-    //                 slider_pieces = self.white_rooks;
-    //             }
-    //             SliderPieces::Bishop => {
-    //                 slider_pieces = self.white_bishops;
-    //             }
-    //         }
-    //     } else {
-    //         their_occupancies = self.white_occupancies;
-    //         match slider_piece_type {
-    //             SliderPieces::Queen => {
-    //                 slider_pieces = self.black_queens;
-    //             }
-    //             SliderPieces::Rook => {
-    //                 slider_pieces = self.black_rooks;
-    //             }
-    //             SliderPieces::Bishop => {
-    //                 slider_pieces = self.black_bishops;
-    //             }
-    //         }
-    //     }
+        // println!("Our slider pieces bitboard:");
+        // print_bitboard(slider_pieces);
 
-    //     while slider_pieces != 0 {
-    //         source_square = get_lsb_index(slider_pieces).expect("This should not happen.");
+        while slider_pieces != 0 {
+            source_square = get_lsb_index(slider_pieces).expect("This should not happen.");
+            removes_castling_rights_short = false;
+            removes_castling_rights_long = false;
 
-    //         // Get moves and captures seperately.
-    //         slider_piece_attacks = match slider_piece_type {
-    //             SliderPieces::Queen => {
-    //                 self.get_queen_attacks(source_square, self.all_occupancies)
-    //             }
-    //             SliderPieces::Rook => {
-    //                 self.get_rook_attacks(source_square, self.all_occupancies)
-    //             }
-    //             SliderPieces::Bishop => {
-    //                 self.get_bishop_attacks(source_square, self.all_occupancies)
-    //             }
-    //         };
+            // Get moves and captures seperately.
+            match slider_piece_type {
+                PieceType::Queen => {
+                    slider_piece_attacks = self.get_queen_attacks(source_square, all_occupancies);
+                }
+                PieceType::Rook => {
+                    slider_piece_attacks = self.get_rook_attacks(source_square, all_occupancies);
 
-    //         quiet_moves = slider_piece_attacks & (!self.all_occupancies);
-    //         captures = slider_piece_attacks & their_occupancies;
+                    // We need to check if this move would remove castling rights.
+                    if source_square == rook_square_offset && self.white_to_move && self.can_white_castle_long {
+                        removes_castling_rights_long = true;
+                    } else if source_square == rook_square_offset + 7 && self.white_to_move && self.can_white_castle_short {
+                        removes_castling_rights_short = true;
+                    } else if source_square == rook_square_offset && !self.white_to_move && self.can_black_castle_long {
+                        removes_castling_rights_long = true;
+                    } else if source_square == rook_square_offset + 7 && !self.white_to_move && self.can_black_castle_short {
+                        removes_castling_rights_short = true;
+                    }
+                }
+                PieceType::Bishop => {
+                    slider_piece_attacks = self.get_bishop_attacks(source_square, all_occupancies);
+                }
+                _ => {
+                    panic!("Tried to get slider piece attacks for non-slider piece.");
+                }
+            };
 
-    //         while quiet_moves != 0 {
-    //             target_square = get_lsb_index(quiet_moves).expect("This should not be empty.");
-    //             moves.push(Move {
-    //                 from_square: source_square,
-    //                 to_square: target_square,
-    //                 is_check: None,
-    //                 next_en_passant_target_coord: None,
-    //                 pawn_promoting_to: None,
-    //                 castle_side: None,
-    //             });
-    //             quiet_moves = pop_bit(quiet_moves, target_square);
-    //         }
+            quiet_moves = slider_piece_attacks & (!all_occupancies);
+            captures = slider_piece_attacks & their_occupancies;
 
-    //         while captures != 0 {
-    //             target_square = get_lsb_index(captures).expect("This should not be empty.");
-    //             moves.push(Move {
-    //                 from_square: source_square,
-    //                 to_square: target_square,
-    //                 is_check: None,
-    //                 next_en_passant_target_coord: None,
-    //                 pawn_promoting_to: None,
-    //                 castle_side: None,
-    //             });
-    //             captures = pop_bit(captures, target_square);
-    //         }
+            while quiet_moves != 0 {
+                target_square = get_lsb_index(quiet_moves).expect("This should not be empty.");
+                moves.push(Move {
+                    from_square: source_square,
+                    from_piece_type: Some(slider_piece_type),
+                    to_square: target_square,
+                    to_piece_type: None,
+                    last_en_passant_target_coord: self.en_passant_target,
+                    next_en_passant_target_coord: None,
+                    is_check: None,
+                    pawn_promoting_to: None,
+                    removes_castling_rights_short: removes_castling_rights_short,
+                    removes_castling_rights_long: removes_castling_rights_long,
+                    castle_side: None,
+                });
+                quiet_moves = pop_bit(quiet_moves, target_square);
+            }
 
-    //         slider_pieces = pop_bit(slider_pieces, source_square);
-    //     }
+            while captures != 0 {
+                target_square = get_lsb_index(captures).expect("This should not be empty.");
+                (to_piece_type, _) = self.get_piece_at_square(target_square);
 
-    //     return moves;
-    // }
+                moves.push(Move {
+                    from_square: source_square,
+                    from_piece_type: Some(slider_piece_type),
+                    to_square: target_square,
+                    to_piece_type: to_piece_type,
+                    last_en_passant_target_coord: self.en_passant_target,
+                    next_en_passant_target_coord: None,
+                    is_check: None,
+                    pawn_promoting_to: None,
+                    removes_castling_rights_short: removes_castling_rights_short,
+                    removes_castling_rights_long: removes_castling_rights_long,
+                    castle_side: None,
+                });
+                captures = pop_bit(captures, target_square);
+            }
+
+            slider_pieces = pop_bit(slider_pieces, source_square);
+        }
+
+        return moves;
+    }
 
     // pub fn get_moves_knight(&self) -> Vec<Move> {
     //     let mut moves: Vec<Move> = vec![];
