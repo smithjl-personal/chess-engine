@@ -964,7 +964,7 @@ impl<'a> ChessGame<'a> {
         moves.append(&mut self.get_moves_slider(PieceType::Queen));
         moves.append(&mut self.get_moves_slider(PieceType::Rook));
         moves.append(&mut self.get_moves_slider(PieceType::Bishop));
-        // moves.append(&mut self.get_moves_knight());
+        moves.append(&mut self.get_moves_knight());
         // moves.append(&mut self.get_moves_king());
         // moves.append(&mut self.get_moves_pawns());
 
@@ -1106,61 +1106,74 @@ impl<'a> ChessGame<'a> {
         return moves;
     }
 
-    // pub fn get_moves_knight(&self) -> Vec<Move> {
-    //     let mut moves: Vec<Move> = vec![];
-    //     let mut source_square: usize;
-    //     let mut target_square: usize;
-    //     let mut knights: u64;
-    //     let mut quiet_moves: u64;
-    //     let mut captures: u64;
-    //     let their_occupancies: u64;
+    pub fn get_moves_knight(&self) -> Vec<Move> {
+        let mut moves: Vec<Move> = vec![];
+        let mut source_square: usize;
+        let mut target_square: usize;
+        let mut knights: u64;
+        let mut quiet_moves: u64;
+        let mut captures: u64;
+        let mut to_piece_type: Option<PieceType>;
+        let their_occupancies: u64;
 
-    //     if self.white_to_move {
-    //         their_occupancies = self.black_occupancies;
-    //         knights = self.white_knights;
-    //     } else {
-    //         their_occupancies = self.white_occupancies;
-    //         knights = self.black_knights;
-    //     }
+        if self.white_to_move {
+            their_occupancies = self.occupancy_bitboards[Color::Black.occupancy_bitboard_index()];
+            knights = self.piece_bitboards[Color::White.piece_bitboard_offset() + PieceType::Knight.bitboard_index()];
+        } else {
+            their_occupancies = self.occupancy_bitboards[Color::White.occupancy_bitboard_index()];
+            knights = self.piece_bitboards[Color::Black.piece_bitboard_offset() + PieceType::Knight.bitboard_index()];
+        }
 
-    //     while knights != 0 {
-    //         source_square = get_lsb_index(knights).expect("This should not happen.");
+        while knights != 0 {
+            source_square = get_lsb_index(knights).expect("This should not happen.");
 
-    //         // Get moves and captures seperately.
-    //         quiet_moves = self.bitboard_constants.knight_attacks[source_square] & (!self.all_occupancies);
-    //         captures = self.bitboard_constants.knight_attacks[source_square] & their_occupancies;
+            // Get moves and captures seperately.
+            quiet_moves = self.bitboard_constants.knight_attacks[source_square] & (!self.occupancy_bitboards[2]);
+            captures = self.bitboard_constants.knight_attacks[source_square] & their_occupancies;
 
-    //         while quiet_moves != 0 {
-    //             target_square = get_lsb_index(quiet_moves).expect("This should not be empty.");
-    //             moves.push(Move {
-    //                 from_square: source_square,
-    //                 to_square: target_square,
-    //                 is_check: None,
-    //                 next_en_passant_target_coord: None,
-    //                 pawn_promoting_to: None,
-    //                 castle_side: None,
-    //             });
-    //             quiet_moves = pop_bit(quiet_moves, target_square);
-    //         }
+            while quiet_moves != 0 {
+                target_square = get_lsb_index(quiet_moves).expect("This should not be empty.");
+                moves.push(Move {
+                    from_square: source_square,
+                    from_piece_type: Some(PieceType::Knight),
+                    to_square: target_square,
+                    to_piece_type: None,
+                    is_check: None,
+                    last_en_passant_target_coord: self.en_passant_target,
+                    next_en_passant_target_coord: None,
+                    pawn_promoting_to: None,
+                    castle_side: None,
+                    removes_castling_rights_short: false,
+                    removes_castling_rights_long: false,
+                });
+                quiet_moves = pop_bit(quiet_moves, target_square);
+            }
 
-    //         while captures != 0 {
-    //             target_square = get_lsb_index(captures).expect("This should not be empty.");
-    //             moves.push(Move {
-    //                 from_square: source_square,
-    //                 to_square: target_square,
-    //                 is_check: None,
-    //                 next_en_passant_target_coord: None,
-    //                 pawn_promoting_to: None,
-    //                 castle_side: None,
-    //             });
-    //             captures = pop_bit(captures, target_square);
-    //         }
+            while captures != 0 {
+                target_square = get_lsb_index(captures).expect("This should not be empty.");
+                (to_piece_type, _) = self.get_piece_at_square(target_square);
 
-    //         knights = pop_bit(knights, source_square);
-    //     }
+                moves.push(Move {
+                    from_square: source_square,
+                    from_piece_type: Some(PieceType::Knight),
+                    to_square: target_square,
+                    to_piece_type: to_piece_type,
+                    is_check: None,
+                    last_en_passant_target_coord: self.en_passant_target,
+                    next_en_passant_target_coord: None,
+                    pawn_promoting_to: None,
+                    castle_side: None,
+                    removes_castling_rights_short: false,
+                    removes_castling_rights_long: false,
+                });
+                captures = pop_bit(captures, target_square);
+            }
 
-    //     return moves;
-    // }
+            knights = pop_bit(knights, source_square);
+        }
+
+        return moves;
+    }
 
     // pub fn get_moves_king(&self) -> Vec<Move> {
     //     let mut moves: Vec<Move> = vec![];
