@@ -34,18 +34,14 @@ async fn main() {
     // bitboard::print_bitboard(new_game.occupancy_bitboards[1]); // Black occupancies
     // bitboard::print_bitboard(new_game.occupancy_bitboards[0]); // White occupancies
 
-    // let this_move = bitboard::Move {
-    //     from: bitboard::str_coord_to_square("e1").unwrap(),
-    //     to: bitboard::str_coord_to_square("c1").unwrap(),
-    //     is_capture: Some(false),
-    //     is_check: Some(false),
-    //     next_en_pessant_target_coord: None,
-    //     pawn_promoting_to: None,
-    //     castle_side: Some(bitboard::CastleSides::Long),
-    // };
+    let from_square = bitboard::str_coord_to_square("e4").unwrap();
+    let to_square = bitboard::str_coord_to_square("e6").unwrap();
+    let user_input_move = bitboard::Move::new(from_square, to_square);
 
-    //new_game.make_move(&this_move, false);
-    //new_game.print_board();
-    // print_bitboard(new_game.all_occupancies);
-    //new_game.print_legal_moves();
+    // Has move with populated meta-data.
+    let this_move = new_game.choose_move_from_legal_move(&user_input_move).expect("Testing, but should be non-null...");
+
+    new_game.make_move(&this_move, false);
+    new_game.print_board();
+    new_game.print_legal_moves();
 }

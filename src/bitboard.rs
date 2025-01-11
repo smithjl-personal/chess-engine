@@ -64,6 +64,7 @@ pub struct Move {
     // En-Passant target tracking.
     pub last_en_passant_target_coord: Option<usize>,
     pub next_en_passant_target_coord: Option<usize>,
+    pub is_en_passant_capture: bool,
 
     // Pawn promotion.
     pub pawn_promoting_to: Option<PieceType>,
@@ -86,6 +87,7 @@ impl Move {
             to_piece_type: None,
             last_en_passant_target_coord: None,
             next_en_passant_target_coord: None,
+            is_en_passant_capture: false,
             pawn_promoting_to: None,
             castle_side: None,
             removes_castling_rights_short: false,
@@ -629,295 +631,176 @@ impl<'a> ChessGame<'a> {
     }
 
 
-    // pub fn make_move(&mut self, this_move: &Move, debugging: bool) {
-    //     let (source_piece_unchecked, source_side_unchecked) = self.get_piece_at_square(this_move.from_square);
-    //     let source_piece = match source_piece_unchecked {
-    //         Some(p) => p,
-    //         None => {
-    //             panic!("Something has gone very wrong.");
-    //         }
-    //     };
-    //     // Handle generic captures, and en-passant captures.
-    //     let (target_piece,_) = self.get_piece_at_square(this_move.to_square);
-    //     let our_color = source_side_unchecked.unwrap();
-    //     let their_color = match our_color {
-    //         Color::White => Color::Black,
-    //         Color::Black => Color::White,
-    //     };
+    pub fn make_move(&mut self, this_move: &Move, debugging: bool) {
+        let source_piece = this_move.from_piece_type.expect("This should always be here.");
 
-    //     if debugging {
-    //         println!("Debug output (start function) {:#?}", this_move);
-    //         println!("Our Color: {:#?}\n Their Color: {:#?}", our_color, their_color);
-    //     }
-
-    //     // Remove our piece from it's starting square, and place it in the new spot.
-    //     // This does not handle castling, and en-passant logic.
-    //     match our_color {
-    //         // Move the piece from it's source to the destination.
-    //         Color::White => {
-    //             match source_piece {
-    //                 PieceType::Pawn => {
-    //                     self.white_pawns = pop_bit(self.white_pawns, this_move.from_square);
-
-    //                     if debugging {
-    //                         println!("Looking at moving our pawns.");
-    //                     }
-
-    //                     // Special logic for pawn promotion.
-    //                     match this_move.pawn_promoting_to {
-    //                         Some(piece_promoted_to) => {
-    //                             match piece_promoted_to {
-    //                                 PieceType::Queen => self.white_queens = set_bit(self.white_queens, this_move.to_square),
-    //                                 PieceType::Rook => self.white_rooks = set_bit(self.white_rooks, this_move.to_square),
-    //                                 PieceType::Bishop => self.white_bishops = set_bit(self.white_bishops, this_move.to_square),
-    //                                 PieceType::Knight => self.white_knights = set_bit(self.white_knights, this_move.to_square),
-    //                                 _ => panic!("Tried to promote to an illegal piece."),
-    //                             }
-    //                         },
-    //                         None => self.white_pawns = set_bit(self.white_pawns, this_move.to_square),
-    //                     }
-                        
-    //                 },
-    //                 PieceType::Bishop => {
-    //                     self.white_bishops = pop_bit(self.white_bishops, this_move.from_square);
-    //                     self.white_bishops = set_bit(self.white_bishops, this_move.to_square);
-    //                 },
-    //                 PieceType::Knight => {
-    //                     self.white_knights = pop_bit(self.white_knights, this_move.from_square);
-    //                     self.white_knights = set_bit(self.white_knights, this_move.to_square);
-    //                 },
-    //                 PieceType::Rook => {
-    //                     self.white_rooks = pop_bit(self.white_rooks, this_move.from_square);
-    //                     self.white_rooks = set_bit(self.white_rooks, this_move.to_square);
-    //                 },
-    //                 PieceType::Queen => {
-    //                     self.white_queens = pop_bit(self.white_queens, this_move.from_square);
-    //                     self.white_queens = set_bit(self.white_queens, this_move.to_square);
-    //                 },
-    //                 PieceType::King => {
-    //                     self.white_king = pop_bit(self.white_king, this_move.from_square);
-    //                     self.white_king = set_bit(self.white_king, this_move.to_square);
-    //                 },
-    //             }
-
-    //             // Update our occupancies.
-    //             self.white_occupancies = pop_bit(self.white_occupancies, this_move.from_square);
-    //             self.white_occupancies = set_bit(self.white_occupancies, this_move.to_square);
-    //         },
-    //         Color::Black => {
-    //             match source_piece {
-    //                 PieceType::Pawn => {
-    //                     self.black_pawns = pop_bit(self.black_pawns, this_move.from_square);
-    //                     self.black_pawns = set_bit(self.black_pawns, this_move.to_square);
-    //                 },
-    //                 PieceType::Bishop => {
-    //                     self.black_bishops = pop_bit(self.black_bishops, this_move.from_square);
-    //                     self.black_bishops = set_bit(self.black_bishops, this_move.to_square);
-    //                 },
-    //                 PieceType::Knight => {
-    //                     self.black_knights = pop_bit(self.black_knights, this_move.from_square);
-    //                     self.black_knights = set_bit(self.black_knights, this_move.to_square);
-    //                 },
-    //                 PieceType::Rook => {
-    //                     self.black_rooks = pop_bit(self.black_rooks, this_move.from_square);
-    //                     self.black_rooks = set_bit(self.black_rooks, this_move.to_square);
-    //                 },
-    //                 PieceType::Queen => {
-    //                     self.black_queens = pop_bit(self.black_queens, this_move.from_square);
-    //                     self.black_queens = set_bit(self.black_queens, this_move.to_square);
-    //                 },
-    //                 PieceType::King => {
-    //                     self.black_king = pop_bit(self.black_king, this_move.from_square);
-    //                     self.black_king = set_bit(self.black_king, this_move.to_square);
-    //                 },
-    //             }
-
-    //             // Update our occupancies.
-    //             self.black_occupancies = pop_bit(self.black_occupancies, this_move.from_square);
-    //             self.black_occupancies = set_bit(self.black_occupancies, this_move.to_square);
-    //         }
-    //     }
-
-    //     // Update all occupancies, source piece always moves.
-    //     self.all_occupancies = pop_bit(self.all_occupancies, this_move.from_square);
-
-    //     // Figure out if we are capturing.
-    //     if this_move.to_piece_type.is_none() {
-    //         panic!("Tried to make a move, but not sure if it was a capture or not. Cannot proceed.");
-    //     }
-
-    //     let is_capture = this_move.to_piece_type.is_some();
-    //     if !is_capture {
-    //         if debugging {
-    //             println!("This move is not a capture. Add occupancy to destination.");
-    //         }
-    //         self.all_occupancies = set_bit(self.all_occupancies, this_move.to_square);
-    //     } else {
-    //         match target_piece {
-    //             Some(piece_on_target_square) => {
-    //                 match their_color {
-    //                     // Move the piece from it's source to the destination.
-    //                     Color::White => {
-    //                         match piece_on_target_square {
-    //                             PieceType::Pawn => {
-    //                                 self.white_pawns = pop_bit(self.white_pawns, this_move.to_square);
-    //                             },
-    //                             PieceType::Bishop => {
-    //                                 self.white_bishops = pop_bit(self.white_bishops, this_move.to_square);
-    //                             },
-    //                             PieceType::Knight => {
-    //                                 self.white_knights = pop_bit(self.white_knights, this_move.to_square);
-    //                             },
-    //                             PieceType::Rook => {
-    //                                 self.white_rooks = pop_bit(self.white_rooks, this_move.to_square);
-    //                             },
-    //                             PieceType::Queen => {
-    //                                 self.white_queens = pop_bit(self.white_queens, this_move.to_square);
-    //                             },
-    //                             PieceType::King => {
-    //                                 panic!("You cannot capture the king.");
-    //                             },
-    //                         }
-
-    //                         // Update their occupancies.
-    //                         self.white_occupancies = pop_bit(self.white_occupancies, this_move.to_square);
-    //                     },
-    //                     Color::Black => {
-    //                         if debugging {
-    //                             println!("Handling capture. Their color is black. Piece on their square is: {:#?}", piece_on_target_square);
-    //                         }
-    //                         match piece_on_target_square {
-    //                             PieceType::Pawn => {
-    //                                 self.black_pawns = pop_bit(self.black_pawns, this_move.to_square);
-    //                             },
-    //                             PieceType::Bishop => {
-    //                                 self.black_bishops = pop_bit(self.black_bishops, this_move.to_square);
-    //                             },
-    //                             PieceType::Knight => {
-    //                                 self.black_knights = pop_bit(self.black_knights, this_move.to_square);
-    //                             },
-    //                             PieceType::Rook => {
-    //                                 if debugging {
-    //                                     println!("Before popping black rook.");
-    //                                     print_bitboard(self.black_rooks);
-    //                                 }
-                                    
-    //                                 self.black_rooks = pop_bit(self.black_rooks, this_move.to_square);
-
-    //                                 if debugging {
-    //                                     println!("After popping black rook.");
-    //                                     print_bitboard(self.black_rooks);
-    //                                 }
-    //                             },
-    //                             PieceType::Queen => {
-    //                                 self.black_queens = pop_bit(self.black_queens, this_move.to_square);
-    //                             },
-    //                             PieceType::King => {
-    //                                 panic!("You cannot capture the king.");
-    //                             },
-    //                         }
-
-    //                         // Update their occupancies.
-    //                         self.black_occupancies = pop_bit(self.black_occupancies, this_move.to_square);
-    //                     }
-    //                 }
-    //             },
-
-    //             // This is an en-passant capture. Treat it as such.
-    //             None => {
-    //                 if debugging {
-    //                     println!("Handling en-passant capture...");
-    //                 }
-    //                 self.all_occupancies = set_bit(self.all_occupancies, this_move.to_square);
-    //                 match their_color {
-    //                     Color::White => {
-    //                         self.white_pawns = pop_bit(self.white_pawns, this_move.to_square - 8);
-    //                         self.white_occupancies = pop_bit(self.white_occupancies, this_move.to_square - 8);
-    //                         self.all_occupancies = pop_bit(self.all_occupancies, this_move.to_square - 8);
-    //                     },
-    //                     Color::Black => {
-    //                         self.black_pawns = pop_bit(self.black_pawns, this_move.to_square + 8);
-    //                         self.black_occupancies = pop_bit(self.black_occupancies, this_move.to_square + 8);
-    //                         self.all_occupancies = pop_bit(self.all_occupancies, this_move.to_square + 8);
-    //                     },
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    //     // Lastly, handle castling.
-    //     match this_move.castle_side {
-    //         None => (),
-    //         Some(side) => {
-    //             let king_from_position = this_move.from_square;
-    //             let rook_from_position = match side {
-    //                 CastleSides::Short => king_from_position + 3,
-    //                 CastleSides::Long => king_from_position - 4,
-    //             };
-    //             let rook_to_position = match side {
-    //                 CastleSides::Short => king_from_position + 1,
-    //                 CastleSides::Long => king_from_position - 1,
-    //             };
-    //             match our_color {
-    //                 Color::White => {
-    //                     self.white_rooks = pop_bit(self.white_rooks, rook_from_position);
-    //                     self.white_rooks = set_bit(self.white_rooks, rook_to_position);
-    //                     self.white_occupancies = pop_bit(self.white_occupancies, rook_from_position);
-    //                     self.white_occupancies = set_bit(self.white_occupancies, rook_to_position);
-    //                 },
-    //                 Color::Black => {
-    //                     self.black_rooks = pop_bit(self.black_rooks, rook_from_position);
-    //                     self.black_rooks = set_bit(self.black_rooks, rook_to_position);
-    //                     self.black_occupancies = pop_bit(self.black_occupancies, rook_from_position);
-    //                     self.black_occupancies = set_bit(self.black_occupancies, rook_to_position);
-    //                 }
-    //             }
-
-    //             self.all_occupancies = pop_bit(self.all_occupancies, rook_from_position);
-    //             self.all_occupancies = set_bit(self.all_occupancies, rook_to_position);
-    //         }
-    //     }
+        // Handle generic captures, and en-passant captures.
+        //let (target_piece,_) = self.get_piece_at_square(this_move.to_square);
+        let our_color: Color;
+        let their_color: Color;
 
 
-    //     // Forfeiting castling rights.
-    //     if source_piece == PieceType::King {
-    //         match our_color {
-    //             Color::White => {
-    //                 self.can_white_castle_short = false;
-    //                 self.can_white_castle_long = false;
-    //             },
-    //             Color::Black => {
-    //                 self.can_black_castle_short = false;
-    //                 self.can_black_castle_long = false;
-    //             },
-    //         }
-    //     }
+        if self.white_to_move {
+            our_color = Color::White;
+            their_color = Color::Black;
+        } else {
+            our_color = Color::Black;
+            their_color = Color::White;
+        }
 
-    //     if source_piece == PieceType::Rook {
-    //         match our_color {
-    //             Color::White => {
-    //                 if this_move.from_square == 63 {
-    //                     self.can_white_castle_short = false;
-    //                 } else if this_move.from_square == 56 {
-    //                     self.can_white_castle_long = false;
-    //                 }
-    //             },
-    //             Color::Black => {
-    //                 if this_move.from_square == 7 {
-    //                     self.can_black_castle_short = false;
-    //                 } else if this_move.from_square == 0 {
-    //                     self.can_black_castle_long = false;
-    //                 }
-    //             },
-    //         }
-    //     }
+        let our_piece_bitboard_offset: usize = our_color.piece_bitboard_offset();
+        let our_piece_bitboard_index: usize = our_piece_bitboard_offset + source_piece.bitboard_index();
+        let our_occupancies_index: usize = our_color.occupancy_bitboard_index();
+        let their_piece_bitboard_offset: usize = their_color.piece_bitboard_offset();
+        let their_occupancies_index: usize = their_color.occupancy_bitboard_index();
 
-    //     // Only needed if we are capturing.
-    //     self.en_passant_target = this_move.next_en_passant_target_coord;
+        if debugging {
+            println!("Debug output (start function) {:#?}", this_move);
+            println!("Our Color: {:#?}\n Their Color: {:#?}", our_color, their_color);
+        }
 
-    //     // Important for checking if move is illegal.
-    //     self.white_to_move = !self.white_to_move;
-    // }
+        // Remove our piece from it's starting square, and place it in the new spot.
+        // This does not handle castling, and en-passant logic.
+        match source_piece {
+            PieceType::Pawn => {
+                self.piece_bitboards[our_piece_bitboard_index] = pop_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.from_square);
+
+                // Special logic for pawn promotion.
+                match this_move.pawn_promoting_to {
+                    Some(piece_promoted_to) => {
+                        match piece_promoted_to {
+                            PieceType::Queen => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = set_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
+                            PieceType::Rook => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = set_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
+                            PieceType::Bishop => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = set_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
+                            PieceType::Knight => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = set_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
+                            _ => panic!("Tried to promote to an illegal piece."),
+                        }
+                    },
+                    None => self.piece_bitboards[our_piece_bitboard_index] = set_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.to_square),
+                }
+                
+            },
+
+            // Every other piece, remove it from the source, place it at the destination.
+            _ => {
+                self.piece_bitboards[our_piece_bitboard_index] = pop_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.from_square);
+                self.piece_bitboards[our_piece_bitboard_index] = set_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.to_square);
+            }
+        }
+
+        // Update our occupancies.
+        self.occupancy_bitboards[our_occupancies_index] = pop_bit(self.occupancy_bitboards[our_occupancies_index], this_move.from_square);
+        self.occupancy_bitboards[our_occupancies_index] = set_bit(self.occupancy_bitboards[our_occupancies_index], this_move.to_square);
+
+        // Update all occupancies, source piece always moves.
+        self.occupancy_bitboards[2] = pop_bit(self.occupancy_bitboards[2], this_move.from_square);
+
+        // Figure out if we are capturing.
+        let is_capture = this_move.to_piece_type.is_some();
+        if !is_capture {
+            self.occupancy_bitboards[2] = set_bit(self.occupancy_bitboards[2], this_move.to_square);
+        } else {
+            let their_piece = this_move.to_piece_type.expect("Should be here, thanks to guard.");
+            let their_piece_bitboard_index = their_piece.bitboard_index() + their_piece_bitboard_offset;
+
+            // Remove their piece from the square; and update their occupancies.
+            self.piece_bitboards[their_piece_bitboard_index] = pop_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
+            self.occupancy_bitboards[their_occupancies_index] = pop_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
+            match their_piece {
+                // For pawn captures, handle en-passant.
+                PieceType::Pawn => {
+                    if this_move.is_en_passant_capture {
+
+                        // Place our pawn on the target square. Normal captures do not need to update this, but en-passant does.
+                        self.occupancy_bitboards[2] = set_bit(self.occupancy_bitboards[2], this_move.to_square);
+                        let en_passant_target_pawn_index: usize = match their_color {
+                            Color::White => { this_move.to_square - 8 },
+                            Color::Black => { this_move.to_square + 8 },
+                        };
+
+                        // Remove their pawn we captured en-passant.
+                        self.piece_bitboards[their_piece_bitboard_offset + their_piece.bitboard_index()] = pop_bit(self.piece_bitboards[their_piece_bitboard_offset + their_piece.bitboard_index()], en_passant_target_pawn_index);
+
+                        // Remove their occupancy.
+                        self.occupancy_bitboards[their_occupancies_index] = pop_bit(self.occupancy_bitboards[their_occupancies_index], en_passant_target_pawn_index);
+
+                        // Remove global occupancy.
+                        self.occupancy_bitboards[2] = pop_bit(self.occupancy_bitboards[2], en_passant_target_pawn_index);
+                    } else {
+                        // Remove that piece from the board.
+                        self.piece_bitboards[their_piece_bitboard_index] = pop_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
+
+                        // Update their occupancies.
+                        self.occupancy_bitboards[their_occupancies_index] = pop_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
+                    }
+                },
+
+                // For all non-pawn captures...
+                _ => {
+
+                    // Remove that piece from the board.
+                    self.piece_bitboards[their_piece_bitboard_index] = pop_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
+
+                    // Update their occupancies.
+                    self.occupancy_bitboards[their_occupancies_index] = pop_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
+                }
+            }
+        }
+
+        // Lastly, handle castling.
+        match this_move.castle_side {
+            None => (),
+            Some(side) => {
+                let king_from_position = this_move.from_square;
+                let rook_from_position = match side {
+                    CastleSides::Short => king_from_position + 3,
+                    CastleSides::Long => king_from_position - 4,
+                };
+                let rook_to_position = match side {
+                    CastleSides::Short => king_from_position + 1,
+                    CastleSides::Long => king_from_position - 1,
+                };
+
+                // Move our rook over.
+                let rook_bitboard_index = our_piece_bitboard_offset + PieceType::Rook.bitboard_index();
+                self.piece_bitboards[rook_bitboard_index] = pop_bit(self.piece_bitboards[rook_bitboard_index], rook_from_position);
+                self.piece_bitboards[rook_bitboard_index] = set_bit(self.piece_bitboards[rook_bitboard_index], rook_to_position);
+
+                // Update our occupancies.
+                self.occupancy_bitboards[our_occupancies_index] = pop_bit(self.occupancy_bitboards[our_occupancies_index], rook_from_position);
+                self.occupancy_bitboards[our_occupancies_index] = set_bit(self.occupancy_bitboards[our_occupancies_index], rook_to_position);
+
+                // Update global occupancies.
+                self.occupancy_bitboards[2] = pop_bit(self.occupancy_bitboards[2], rook_from_position);
+                self.occupancy_bitboards[2] = set_bit(self.occupancy_bitboards[2], rook_to_position);
+            }
+        }
+
+
+        // Forfeiting castling rights.
+        match our_color {
+            Color::White => {
+                if this_move.removes_castling_rights_short {
+                    self.can_white_castle_short = false;
+                } else if this_move.removes_castling_rights_long {
+                    self.can_white_castle_long = false;
+                }
+            },
+            Color::Black => {
+                if this_move.removes_castling_rights_short {
+                    self.can_black_castle_short = false;
+                } else if this_move.removes_castling_rights_long {
+                    self.can_black_castle_long = false;
+                }
+            },
+        }
+
+        // Only needed if we are capturing.
+        self.en_passant_target = this_move.next_en_passant_target_coord;
+
+        // Important for checking if move is illegal.
+        self.white_to_move = !self.white_to_move;
+    }
 
 
     pub fn is_king_attacked(&self, side_attacked: &Color) -> bool {
@@ -927,6 +810,20 @@ impl<'a> ChessGame<'a> {
             Color::White => self.is_square_attacked(king_square, &Color::Black),
             Color::Black => self.is_square_attacked(king_square, &Color::White),
         };
+    }
+
+
+    // Meant for users/bots to pick a move, so it is populated with all the data we need.
+    pub fn choose_move_from_legal_move(&self, this_move: &Move) -> Option<Move> {
+        let moves = self.get_legal_moves();
+
+        for m in moves.iter() {
+            if m == this_move {
+                return Some(*m);
+            }
+        }
+
+        return None;
     }
 
 
@@ -941,19 +838,17 @@ impl<'a> ChessGame<'a> {
             our_side = &Color::Black;
         }
 
-        // moves.push(*this_move);
 
         // Try the move, drop it if it's illegal.
-        // for this_move in possible_moves.iter() {
-        //     let mut self_copy = self.clone();
-        //     self_copy.make_move(this_move, false);
-        //     if !self_copy.is_king_attacked(our_side) {
-        //         moves.push(*this_move);
-        //     }
-        // }
+        for this_move in possible_moves.iter() {
+            let mut self_copy = self.clone();
+            self_copy.make_move(this_move, false);
+            if !self_copy.is_king_attacked(our_side) {
+                moves.push(*this_move);
+            }
+        }
 
-        // return moves;
-        return possible_moves;
+        return moves;
     }
 
     // Will generate moves that put self in check.
@@ -1071,6 +966,7 @@ impl<'a> ChessGame<'a> {
                     to_piece_type: None,
                     last_en_passant_target_coord: self.en_passant_target,
                     next_en_passant_target_coord: None,
+                    is_en_passant_capture: false,
                     is_check: None,
                     pawn_promoting_to: None,
                     removes_castling_rights_short: removes_castling_rights_short,
@@ -1091,6 +987,7 @@ impl<'a> ChessGame<'a> {
                     to_piece_type: to_piece_type,
                     last_en_passant_target_coord: self.en_passant_target,
                     next_en_passant_target_coord: None,
+                    is_en_passant_capture: false,
                     is_check: None,
                     pawn_promoting_to: None,
                     removes_castling_rights_short: removes_castling_rights_short,
@@ -1141,6 +1038,7 @@ impl<'a> ChessGame<'a> {
                     is_check: None,
                     last_en_passant_target_coord: self.en_passant_target,
                     next_en_passant_target_coord: None,
+                    is_en_passant_capture: false,
                     pawn_promoting_to: None,
                     castle_side: None,
                     removes_castling_rights_short: false,
@@ -1161,6 +1059,7 @@ impl<'a> ChessGame<'a> {
                     is_check: None,
                     last_en_passant_target_coord: self.en_passant_target,
                     next_en_passant_target_coord: None,
+                    is_en_passant_capture: false,
                     pawn_promoting_to: None,
                     castle_side: None,
                     removes_castling_rights_short: false,
@@ -1223,6 +1122,7 @@ impl<'a> ChessGame<'a> {
                 is_check: None,
                 last_en_passant_target_coord: self.en_passant_target,
                 next_en_passant_target_coord: None,
+                is_en_passant_capture: false,
                 pawn_promoting_to: None,
                 castle_side: None,
                 removes_castling_rights_short: can_castle_short,
@@ -1244,6 +1144,7 @@ impl<'a> ChessGame<'a> {
                 is_check: None,
                 last_en_passant_target_coord: self.en_passant_target,
                 next_en_passant_target_coord: None,
+                is_en_passant_capture: false,
                 pawn_promoting_to: None,
                 castle_side: None,
                 removes_castling_rights_short: can_castle_short,
@@ -1273,6 +1174,7 @@ impl<'a> ChessGame<'a> {
                     is_check: None,
                     last_en_passant_target_coord: self.en_passant_target,
                     next_en_passant_target_coord: None,
+                    is_en_passant_capture: false,
                     pawn_promoting_to: None,
                     castle_side: Some(CastleSides::Short),
                     removes_castling_rights_short: can_castle_short,
@@ -1300,6 +1202,7 @@ impl<'a> ChessGame<'a> {
                     is_check: None,
                     last_en_passant_target_coord: self.en_passant_target,
                     next_en_passant_target_coord: None,
+                    is_en_passant_capture: false,
                     pawn_promoting_to: None,
                     castle_side: Some(CastleSides::Long),
                     removes_castling_rights_short: can_castle_short,
@@ -1327,6 +1230,7 @@ impl<'a> ChessGame<'a> {
         let our_starting_rank_lower: usize;
         let our_starting_rank_upper: usize;
         let all_occupancies: u64 = self.occupancy_bitboards[2];
+        let mut to_piece_type: Option<PieceType>;
         if self.white_to_move {
             our_color = Color::White;
             their_occupancies = self.occupancy_bitboards[Color::Black.occupancy_bitboard_index()];
@@ -1365,6 +1269,7 @@ impl<'a> ChessGame<'a> {
                         is_check: None,
                         last_en_passant_target_coord: self.en_passant_target,
                         next_en_passant_target_coord: None,
+                        is_en_passant_capture: false,
                         pawn_promoting_to: Some(PieceType::Queen),
                         castle_side: None,
                         removes_castling_rights_short: false,
@@ -1378,6 +1283,7 @@ impl<'a> ChessGame<'a> {
                         is_check: None,
                         last_en_passant_target_coord: self.en_passant_target,
                         next_en_passant_target_coord: None,
+                        is_en_passant_capture: false,
                         pawn_promoting_to: Some(PieceType::Rook),
                         castle_side: None,
                         removes_castling_rights_short: false,
@@ -1391,6 +1297,7 @@ impl<'a> ChessGame<'a> {
                         is_check: None,
                         last_en_passant_target_coord: self.en_passant_target,
                         next_en_passant_target_coord: None,
+                        is_en_passant_capture: false,
                         pawn_promoting_to: Some(PieceType::Bishop),
                         castle_side: None,
                         removes_castling_rights_short: false,
@@ -1404,6 +1311,7 @@ impl<'a> ChessGame<'a> {
                         is_check: None,
                         last_en_passant_target_coord: self.en_passant_target,
                         next_en_passant_target_coord: None,
+                        is_en_passant_capture: false,
                         pawn_promoting_to: Some(PieceType::Knight),
                         castle_side: None,
                         removes_castling_rights_short: false,
@@ -1418,6 +1326,7 @@ impl<'a> ChessGame<'a> {
                         is_check: None,
                         last_en_passant_target_coord: self.en_passant_target,
                         next_en_passant_target_coord: None,
+                        is_en_passant_capture: false,
                         pawn_promoting_to: None,
                         castle_side: None,
                         removes_castling_rights_short: false,
@@ -1438,6 +1347,7 @@ impl<'a> ChessGame<'a> {
                             is_check: None,
                             last_en_passant_target_coord: self.en_passant_target,
                             next_en_passant_target_coord: Some((source_square as i32 + pawn_move_offset) as usize),
+                            is_en_passant_capture: false,
                             pawn_promoting_to: None,
                             castle_side: None,
                             removes_castling_rights_short: false,
@@ -1451,15 +1361,17 @@ impl<'a> ChessGame<'a> {
             attacks = self.bitboard_constants.pawn_attacks[our_color.idx()][source_square] & their_occupancies;
             while attacks != 0 {
                 target_square = get_lsb_index(attacks).expect("Should not be empty.");
+                (to_piece_type, _) = self.get_piece_at_square(target_square);
                 if target_square >= promotion_rank_lower && target_square <= promotion_rank_upper {
                     moves.push(Move {
                         from_square: source_square,
                         from_piece_type: Some(PieceType::Pawn),
                         to_square: target_square,
-                        to_piece_type: None,
+                        to_piece_type: to_piece_type,
                         is_check: None,
                         last_en_passant_target_coord: self.en_passant_target,
                         next_en_passant_target_coord: None,
+                        is_en_passant_capture: false,
                         pawn_promoting_to: Some(PieceType::Queen),
                         castle_side: None,
                         removes_castling_rights_short: false,
@@ -1469,10 +1381,11 @@ impl<'a> ChessGame<'a> {
                         from_square: source_square,
                         from_piece_type: Some(PieceType::Pawn),
                         to_square: target_square,
-                        to_piece_type: None,
+                        to_piece_type: to_piece_type,
                         is_check: None,
                         last_en_passant_target_coord: self.en_passant_target,
                         next_en_passant_target_coord: None,
+                        is_en_passant_capture: false,
                         pawn_promoting_to: Some(PieceType::Rook),
                         castle_side: None,
                         removes_castling_rights_short: false,
@@ -1482,10 +1395,11 @@ impl<'a> ChessGame<'a> {
                         from_square: source_square,
                         from_piece_type: Some(PieceType::Pawn),
                         to_square: target_square,
-                        to_piece_type: None,
+                        to_piece_type: to_piece_type,
                         is_check: None,
                         last_en_passant_target_coord: self.en_passant_target,
                         next_en_passant_target_coord: None,
+                        is_en_passant_capture: false,
                         pawn_promoting_to: Some(PieceType::Bishop),
                         castle_side: None,
                         removes_castling_rights_short: false,
@@ -1495,10 +1409,11 @@ impl<'a> ChessGame<'a> {
                         from_square: source_square,
                         from_piece_type: Some(PieceType::Pawn),
                         to_square: target_square,
-                        to_piece_type: None,
+                        to_piece_type: to_piece_type,
                         is_check: None,
                         last_en_passant_target_coord: self.en_passant_target,
                         next_en_passant_target_coord: None,
+                        is_en_passant_capture: false,
                         pawn_promoting_to: Some(PieceType::Knight),
                         castle_side: None,
                         removes_castling_rights_short: false,
@@ -1509,10 +1424,11 @@ impl<'a> ChessGame<'a> {
                         from_square: source_square,
                         from_piece_type: Some(PieceType::Pawn),
                         to_square: target_square,
-                        to_piece_type: None,
+                        to_piece_type: to_piece_type,
                         is_check: None,
                         last_en_passant_target_coord: self.en_passant_target,
                         next_en_passant_target_coord: None,
+                        is_en_passant_capture: false,
                         pawn_promoting_to: None,
                         castle_side: None,
                         removes_castling_rights_short: false,
@@ -1533,10 +1449,11 @@ impl<'a> ChessGame<'a> {
                             from_square: source_square,
                             from_piece_type: Some(PieceType::Pawn),
                             to_square: target_square,
-                            to_piece_type: None,
+                            to_piece_type: Some(PieceType::Pawn),
                             is_check: None,
                             last_en_passant_target_coord: self.en_passant_target,
                             next_en_passant_target_coord: None,
+                            is_en_passant_capture: true,
                             pawn_promoting_to: None,
                             castle_side: None,
                             removes_castling_rights_short: false,
