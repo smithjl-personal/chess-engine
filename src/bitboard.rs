@@ -966,7 +966,7 @@ impl<'a> ChessGame<'a> {
         moves.append(&mut self.get_moves_slider(PieceType::Bishop));
         moves.append(&mut self.get_moves_knight());
         moves.append(&mut self.get_moves_king());
-        // moves.append(&mut self.get_moves_pawns());
+        moves.append(&mut self.get_moves_pawns());
 
         return moves;
     }
@@ -1311,187 +1311,249 @@ impl<'a> ChessGame<'a> {
         return moves;
     }
 
-    // pub fn get_moves_pawns(&self) -> Vec<Move> {
-    //     let mut moves: Vec<Move> = vec![];
-    //     let mut source_square: usize;
-    //     let mut target_square: usize;
+    pub fn get_moves_pawns(&self) -> Vec<Move> {
+        let mut moves: Vec<Move> = vec![];
+        let mut source_square: usize;
+        let mut target_square: usize;
 
-    //     let mut bitboard: u64;
-    //     let mut attacks: u64;
+        let mut bitboard: u64;
+        let mut attacks: u64;
 
-    //     let our_color: Color;
-    //     let their_occupancies: u64;
-    //     let pawn_move_offset: i32;
-    //     let promotion_rank_lower: usize;
-    //     let promotion_rank_upper: usize;
-    //     let our_starting_rank_lower: usize;
-    //     let our_starting_rank_upper: usize;
-    //     if self.white_to_move {
-    //         our_color = Color::White;
-    //         their_occupancies = self.black_occupancies;
-    //         bitboard = self.white_pawns;
-    //         pawn_move_offset = -8;
-    //         promotion_rank_lower = 0;
-    //         promotion_rank_upper = 7;
-    //         our_starting_rank_lower = 48;
-    //         our_starting_rank_upper = 55;
-    //     } else {
-    //         our_color = Color::Black;
-    //         their_occupancies = self.white_occupancies;
-    //         bitboard = self.black_pawns;
-    //         pawn_move_offset = 8;
-    //         promotion_rank_lower = 56;
-    //         promotion_rank_upper = 63;
-    //         our_starting_rank_lower = 8;
-    //         our_starting_rank_upper = 15;
-    //     }
+        let our_color: Color;
+        let their_occupancies: u64;
+        let pawn_move_offset: i32;
+        let promotion_rank_lower: usize;
+        let promotion_rank_upper: usize;
+        let our_starting_rank_lower: usize;
+        let our_starting_rank_upper: usize;
+        let all_occupancies: u64 = self.occupancy_bitboards[2];
+        if self.white_to_move {
+            our_color = Color::White;
+            their_occupancies = self.occupancy_bitboards[Color::Black.occupancy_bitboard_index()];
+            bitboard = self.piece_bitboards[Color::White.piece_bitboard_offset() + PieceType::Pawn.bitboard_index()];
+            pawn_move_offset = -8;
+            promotion_rank_lower = 0;
+            promotion_rank_upper = 7;
+            our_starting_rank_lower = 48;
+            our_starting_rank_upper = 55;
+        } else {
+            our_color = Color::Black;
+            their_occupancies = self.occupancy_bitboards[Color::White.occupancy_bitboard_index()];
+            bitboard = self.piece_bitboards[Color::Black.piece_bitboard_offset() + PieceType::Pawn.bitboard_index()];
+            pawn_move_offset = 8;
+            promotion_rank_lower = 56;
+            promotion_rank_upper = 63;
+            our_starting_rank_lower = 8;
+            our_starting_rank_upper = 15;
+        }
 
-    //     while bitboard != 0 {
-    //         source_square = get_lsb_index(bitboard).expect("This should not fail.");
+        while bitboard != 0 {
+            source_square = get_lsb_index(bitboard).expect("This should not fail.");
 
-    //         // Handles forward moves.
-    //         target_square = (source_square as i32 + pawn_move_offset) as usize;
-    //         let mut is_occupied = get_bit(self.all_occupancies, target_square) != 0;
-    //         if !is_occupied {
+            // Handles forward moves.
+            target_square = (source_square as i32 + pawn_move_offset) as usize;
+            let mut is_occupied = get_bit(all_occupancies, target_square) != 0;
+            if !is_occupied {
 
-    //             // Check for promotions (no capture).
-    //             if target_square >= promotion_rank_lower && target_square <= promotion_rank_upper {
-    //                 moves.push(Move {
-    //                     from_square: source_square,
-    //                     to_square: target_square,
-    //                     is_check: None,
-    //                     next_en_passant_target_coord: None,
-    //                     pawn_promoting_to: Some(PieceType::Queen),
-    //                     castle_side: None,
-    //                 });
-    //                 moves.push(Move {
-    //                     from_square: source_square,
-    //                     to_square: target_square,
-    //                     is_check: None,
-    //                     next_en_passant_target_coord: None,
-    //                     pawn_promoting_to: Some(PieceType::Rook),
-    //                     castle_side: None,
-    //                 });
-    //                 moves.push(Move {
-    //                     from_square: source_square,
-    //                     to_square: target_square,
-    //                     is_check: None,
-    //                     next_en_passant_target_coord: None,
-    //                     pawn_promoting_to: Some(PieceType::Bishop),
-    //                     castle_side: None,
-    //                 });
-    //                 moves.push(Move {
-    //                     from_square: source_square,
-    //                     to_square: target_square,
-    //                     is_check: None,
-    //                     next_en_passant_target_coord: None,
-    //                     pawn_promoting_to: Some(PieceType::Knight),
-    //                     castle_side: None,
-    //                 });
-                    
-    //             } else {
-    //                 moves.push(Move {
-    //                     from_square: source_square,
-    //                     to_square: target_square,
-    //                     is_check: None,
-    //                     next_en_passant_target_coord: None,
-    //                     pawn_promoting_to: None,
-    //                     castle_side: None,
-    //                 });
+                // Check for promotions (no capture).
+                if target_square >= promotion_rank_lower && target_square <= promotion_rank_upper {
+                    moves.push(Move {
+                        from_square: source_square,
+                        from_piece_type: Some(PieceType::Pawn),
+                        to_square: target_square,
+                        to_piece_type: None,
+                        is_check: None,
+                        last_en_passant_target_coord: self.en_passant_target,
+                        next_en_passant_target_coord: None,
+                        pawn_promoting_to: Some(PieceType::Queen),
+                        castle_side: None,
+                        removes_castling_rights_short: false,
+                        removes_castling_rights_long: false,
+                    });
+                    moves.push(Move {
+                        from_square: source_square,
+                        from_piece_type: Some(PieceType::Pawn),
+                        to_square: target_square,
+                        to_piece_type: None,
+                        is_check: None,
+                        last_en_passant_target_coord: self.en_passant_target,
+                        next_en_passant_target_coord: None,
+                        pawn_promoting_to: Some(PieceType::Rook),
+                        castle_side: None,
+                        removes_castling_rights_short: false,
+                        removes_castling_rights_long: false,
+                    });
+                    moves.push(Move {
+                        from_square: source_square,
+                        from_piece_type: Some(PieceType::Pawn),
+                        to_square: target_square,
+                        to_piece_type: None,
+                        is_check: None,
+                        last_en_passant_target_coord: self.en_passant_target,
+                        next_en_passant_target_coord: None,
+                        pawn_promoting_to: Some(PieceType::Bishop),
+                        castle_side: None,
+                        removes_castling_rights_short: false,
+                        removes_castling_rights_long: false,
+                    });
+                    moves.push(Move {
+                        from_square: source_square,
+                        from_piece_type: Some(PieceType::Pawn),
+                        to_square: target_square,
+                        to_piece_type: None,
+                        is_check: None,
+                        last_en_passant_target_coord: self.en_passant_target,
+                        next_en_passant_target_coord: None,
+                        pawn_promoting_to: Some(PieceType::Knight),
+                        castle_side: None,
+                        removes_castling_rights_short: false,
+                        removes_castling_rights_long: false,
+                    });
+                } else {
+                    moves.push(Move {
+                        from_square: source_square,
+                        from_piece_type: Some(PieceType::Pawn),
+                        to_square: target_square,
+                        to_piece_type: None,
+                        is_check: None,
+                        last_en_passant_target_coord: self.en_passant_target,
+                        next_en_passant_target_coord: None,
+                        pawn_promoting_to: None,
+                        castle_side: None,
+                        removes_castling_rights_short: false,
+                        removes_castling_rights_long: false,
+                    });
 
-    //                 // Check for the double move.
-    //                 target_square = (source_square as i32 + pawn_move_offset + pawn_move_offset) as usize;
-    //                 is_occupied = get_bit(self.all_occupancies, target_square) != 0;
+                    // Check for the double move.
+                    target_square = (source_square as i32 + pawn_move_offset + pawn_move_offset) as usize;
+                    is_occupied = get_bit(all_occupancies, target_square) != 0;
 
-    //                 // If pawn is on the 2nd rank, it can move two tiles.
-    //                 if source_square >= our_starting_rank_lower && source_square <= our_starting_rank_upper && !is_occupied {
-    //                     moves.push(Move {
-    //                         from_square: source_square,
-    //                         to_square: target_square,
-    //                         is_check: None,
-    //                         next_en_passant_target_coord: Some((source_square as i32 + pawn_move_offset) as usize),
-    //                         pawn_promoting_to: None,
-    //                         castle_side: None,
-    //                     });
-    //                 }
-    //             }
-    //         }
+                    // If pawn is on the 2nd rank, it can move two tiles.
+                    if source_square >= our_starting_rank_lower && source_square <= our_starting_rank_upper && !is_occupied {
+                        moves.push(Move {
+                            from_square: source_square,
+                            from_piece_type: Some(PieceType::Pawn),
+                            to_square: target_square,
+                            to_piece_type: None,
+                            is_check: None,
+                            last_en_passant_target_coord: self.en_passant_target,
+                            next_en_passant_target_coord: Some((source_square as i32 + pawn_move_offset) as usize),
+                            pawn_promoting_to: None,
+                            castle_side: None,
+                            removes_castling_rights_short: false,
+                            removes_castling_rights_long: false,
+                        });
+                    }
+                }
+            }
 
-    //         // Handles captures (non-en-passant).
-    //         attacks = self.bitboard_constants.pawn_attacks[our_color.idx()][source_square] & their_occupancies;
-    //         while attacks != 0 {
-    //             target_square = get_lsb_index(attacks).expect("Should not be empty.");
-    //             if target_square >= promotion_rank_lower && target_square <= promotion_rank_upper {
-    //                 moves.push(Move {
-    //                     from_square: source_square,
-    //                     to_square: target_square,
-    //                     is_check: None,
-    //                     next_en_passant_target_coord: None,
-    //                     pawn_promoting_to: Some(PieceType::Queen),
-    //                     castle_side: None,
-    //                 });
-    //                 moves.push(Move {
-    //                     from_square: source_square,
-    //                     to_square: target_square,
-    //                     is_check: None,
-    //                     next_en_passant_target_coord: None,
-    //                     pawn_promoting_to: Some(PieceType::Rook),
-    //                     castle_side: None,
-    //                 });
-    //                 moves.push(Move {
-    //                     from_square: source_square,
-    //                     to_square: target_square,
-    //                     is_check: None,
-    //                     next_en_passant_target_coord: None,
-    //                     pawn_promoting_to: Some(PieceType::Bishop),
-    //                     castle_side: None,
-    //                 });
-    //                 moves.push(Move {
-    //                     from_square: source_square,
-    //                     to_square: target_square,
-    //                     is_check: None,
-    //                     next_en_passant_target_coord: None,
-    //                     pawn_promoting_to: Some(PieceType::Knight),
-    //                     castle_side: None,
-    //                 });
-    //             } else {
-    //                 moves.push(Move {
-    //                     from_square: source_square,
-    //                     to_square: target_square,
-    //                     is_check: None,
-    //                     next_en_passant_target_coord: None,
-    //                     pawn_promoting_to: None,
-    //                     castle_side: None,
-    //                 });
-    //             }
-    //             attacks = pop_bit(attacks, target_square);
-    //         }
+            // Handles captures (non-en-passant).
+            attacks = self.bitboard_constants.pawn_attacks[our_color.idx()][source_square] & their_occupancies;
+            while attacks != 0 {
+                target_square = get_lsb_index(attacks).expect("Should not be empty.");
+                if target_square >= promotion_rank_lower && target_square <= promotion_rank_upper {
+                    moves.push(Move {
+                        from_square: source_square,
+                        from_piece_type: Some(PieceType::Pawn),
+                        to_square: target_square,
+                        to_piece_type: None,
+                        is_check: None,
+                        last_en_passant_target_coord: self.en_passant_target,
+                        next_en_passant_target_coord: None,
+                        pawn_promoting_to: Some(PieceType::Queen),
+                        castle_side: None,
+                        removes_castling_rights_short: false,
+                        removes_castling_rights_long: false,
+                    });
+                    moves.push(Move {
+                        from_square: source_square,
+                        from_piece_type: Some(PieceType::Pawn),
+                        to_square: target_square,
+                        to_piece_type: None,
+                        is_check: None,
+                        last_en_passant_target_coord: self.en_passant_target,
+                        next_en_passant_target_coord: None,
+                        pawn_promoting_to: Some(PieceType::Rook),
+                        castle_side: None,
+                        removes_castling_rights_short: false,
+                        removes_castling_rights_long: false,
+                    });
+                    moves.push(Move {
+                        from_square: source_square,
+                        from_piece_type: Some(PieceType::Pawn),
+                        to_square: target_square,
+                        to_piece_type: None,
+                        is_check: None,
+                        last_en_passant_target_coord: self.en_passant_target,
+                        next_en_passant_target_coord: None,
+                        pawn_promoting_to: Some(PieceType::Bishop),
+                        castle_side: None,
+                        removes_castling_rights_short: false,
+                        removes_castling_rights_long: false,
+                    });
+                    moves.push(Move {
+                        from_square: source_square,
+                        from_piece_type: Some(PieceType::Pawn),
+                        to_square: target_square,
+                        to_piece_type: None,
+                        is_check: None,
+                        last_en_passant_target_coord: self.en_passant_target,
+                        next_en_passant_target_coord: None,
+                        pawn_promoting_to: Some(PieceType::Knight),
+                        castle_side: None,
+                        removes_castling_rights_short: false,
+                        removes_castling_rights_long: false,
+                    });
+                } else {
+                    moves.push(Move {
+                        from_square: source_square,
+                        from_piece_type: Some(PieceType::Pawn),
+                        to_square: target_square,
+                        to_piece_type: None,
+                        is_check: None,
+                        last_en_passant_target_coord: self.en_passant_target,
+                        next_en_passant_target_coord: None,
+                        pawn_promoting_to: None,
+                        castle_side: None,
+                        removes_castling_rights_short: false,
+                        removes_castling_rights_long: false,
+                    });
+                }
+                attacks = pop_bit(attacks, target_square);
+            }
 
-    //         // Handles captures (en-passant)
-    //         match self.en_passant_target {
-    //             Some(s) => {
-    //                 attacks = self.bitboard_constants.pawn_attacks[our_color.idx()][source_square] & set_bit(0, s);
-    //                 if attacks != 0 {
-    //                     moves.push(Move {
-    //                         from_square: source_square,
-    //                         to_square: target_square,
-    //                         is_check: None,
-    //                         next_en_passant_target_coord: None,
-    //                         pawn_promoting_to: None,
-    //                         castle_side: None,
-    //                     });
-    //                 }
-    //             }
-    //             _ => ()
-    //         }
+            // Handles captures (en-passant)
+            match self.en_passant_target {
+                Some(s) => {
+                    attacks = self.bitboard_constants.pawn_attacks[our_color.idx()][source_square] & set_bit(0, s);
+
+                    if attacks != 0 {
+                        target_square = get_lsb_index(attacks).expect("This should not be empty.");
+                        moves.push(Move {
+                            from_square: source_square,
+                            from_piece_type: Some(PieceType::Pawn),
+                            to_square: target_square,
+                            to_piece_type: None,
+                            is_check: None,
+                            last_en_passant_target_coord: self.en_passant_target,
+                            next_en_passant_target_coord: None,
+                            pawn_promoting_to: None,
+                            castle_side: None,
+                            removes_castling_rights_short: false,
+                            removes_castling_rights_long: false,
+                        });
+                    }
+                }
+                _ => ()
+            }
 
 
-    //         // Empty the board! and go next.
-    //         bitboard = pop_bit(bitboard, source_square);
-    //     }
+            // Empty the board! and go next.
+            bitboard = pop_bit(bitboard, source_square);
+        }
 
-    //     return moves;
-    // }
+        return moves;
+    }
 }
 
 pub fn square_to_coord(square: usize) -> String {
