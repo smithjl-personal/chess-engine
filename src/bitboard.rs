@@ -367,19 +367,30 @@ impl<'a> ChessGame<'a> {
         };
     }
 
-    pub fn debug_verify_board_state(&self, this_move: &Move, prev_game_state: ChessGame) {
+    pub fn debug_verify_board_state(&self, this_move: &Move, prev_game_state: ChessGame, called_by: &str) {
 
         // Make sure occupancies add up corrrectly.
         if self.occupancy_bitboards[2] != self.occupancy_bitboards[0] | self.occupancy_bitboards[1] {
             println!("Previous game state");
             prev_game_state.print_board();
-            println!("Tried to make move: {:#?}", this_move);
-            // self.print_board();
-            // println!("White occupancies:");
-            // print_bitboard(self.occupancy_bitboards[0]);
-            // println!("Black occupancies:");
-            // print_bitboard(self.occupancy_bitboards[1]);
-            panic!("Occupancy desynced.");
+            println!("Tried to make/unmake move: {:#?}\n\n Ended up with:", this_move);
+
+            println!("White occupancies before:");
+            print_bitboard(prev_game_state.occupancy_bitboards[0]);
+            println!("White occupancies after:");
+            print_bitboard(self.occupancy_bitboards[0]);
+
+            println!("Black occupancies before:");
+            print_bitboard(prev_game_state.occupancy_bitboards[1]);
+            println!("Black occupancies after:");
+            print_bitboard(self.occupancy_bitboards[1]);
+
+            println!("All occupancies before:");
+            print_bitboard(prev_game_state.occupancy_bitboards[2]);
+            println!("All occupancies after:");
+            print_bitboard(self.occupancy_bitboards[2]);
+
+            panic!("Occupancy desynced by {called_by}.");
         }
 
         // Make sure white pieces add up to occupancies.
@@ -388,7 +399,26 @@ impl<'a> ChessGame<'a> {
             constructed_occupancies_white |= self.piece_bitboards[i];
         }
         if self.occupancy_bitboards[0] != constructed_occupancies_white {
-            panic!("White pieces desynced.");
+            println!("Previous game state");
+            prev_game_state.print_board();
+            println!("Tried to make/unmake move: {:#?}\n\n Ended up with:", this_move);
+
+            println!("White occupancies before:");
+            print_bitboard(prev_game_state.occupancy_bitboards[0]);
+            println!("White occupancies after:");
+            print_bitboard(self.occupancy_bitboards[0]);
+
+            println!("Black occupancies before:");
+            print_bitboard(prev_game_state.occupancy_bitboards[1]);
+            println!("Black occupancies after:");
+            print_bitboard(self.occupancy_bitboards[1]);
+
+            println!("All occupancies before:");
+            print_bitboard(prev_game_state.occupancy_bitboards[2]);
+            println!("All occupancies after:");
+            print_bitboard(self.occupancy_bitboards[2]);
+
+            panic!("White pieces desynced by {called_by}.");
         }
 
         let mut constructed_occupancies_black = 0;
@@ -396,7 +426,26 @@ impl<'a> ChessGame<'a> {
             constructed_occupancies_black |= self.piece_bitboards[i];
         }
         if self.occupancy_bitboards[1] != constructed_occupancies_black {
-            panic!("Black pieces desynced.");
+            println!("Previous game state");
+            prev_game_state.print_board();
+            println!("Tried to make/unmake move: {:#?}\n\n Ended up with:", this_move);
+
+            println!("White occupancies before:");
+            print_bitboard(prev_game_state.occupancy_bitboards[0]);
+            println!("White occupancies after:");
+            print_bitboard(self.occupancy_bitboards[0]);
+
+            println!("Black occupancies before:");
+            print_bitboard(prev_game_state.occupancy_bitboards[1]);
+            println!("Black occupancies after:");
+            print_bitboard(self.occupancy_bitboards[1]);
+
+            println!("All occupancies before:");
+            print_bitboard(prev_game_state.occupancy_bitboards[2]);
+            println!("All occupancies after:");
+            print_bitboard(self.occupancy_bitboards[2]);
+
+            panic!("Black pieces desynced by {called_by}.");
         }
 
 
@@ -709,7 +758,7 @@ impl<'a> ChessGame<'a> {
 
 
     pub fn make_move(&mut self, this_move: &Move, update_legal_moves: bool) {
-        //let debug_initial_game_state = self.clone();
+        let debug_initial_game_state = self.clone();
 
         let source_piece = this_move.from_piece_type.expect("This should always be here.");
 
@@ -776,8 +825,8 @@ impl<'a> ChessGame<'a> {
             let their_piece_bitboard_index = their_piece.bitboard_index() + their_piece_bitboard_offset;
 
             // Remove their piece from the square; and update their occupancies.
-            self.piece_bitboards[their_piece_bitboard_index] = pop_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
-            self.occupancy_bitboards[their_occupancies_index] = pop_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
+            // self.piece_bitboards[their_piece_bitboard_index] = pop_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
+            // self.occupancy_bitboards[their_occupancies_index] = pop_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
             match their_piece {
                 // For pawn captures, handle en-passant.
                 PieceType::Pawn => {
@@ -874,14 +923,192 @@ impl<'a> ChessGame<'a> {
         // Important for checking if move is illegal.
         self.white_to_move = !self.white_to_move;
 
+
+
         if update_legal_moves {
-            // Used to find bugs.
-            //self.debug_verify_board_state(this_move, debug_initial_game_state);
+            
 
             // Update our moves!
             self.set_legal_moves();
         }
+
+        // Used to find bugs.
+        self.debug_verify_board_state(this_move, debug_initial_game_state, "Make Move");
     }
+
+
+    pub fn unmake_move(&mut self, this_move: &Move) {
+        let debug_initial_game_state = self.clone();
+
+        let source_piece = this_move.from_piece_type.expect("This should always be here.");
+
+        // Handle generic captures, and en-passant captures.
+        let our_color: Color;
+        let their_color: Color;
+
+        // If I'm unmaking white's move, I'm white.
+        if !self.white_to_move {
+            our_color = Color::White;
+            their_color = Color::Black;
+        } else {
+            our_color = Color::Black;
+            their_color = Color::White;
+        }
+
+        let our_piece_bitboard_offset: usize = our_color.piece_bitboard_offset();
+        let our_piece_bitboard_index: usize = our_piece_bitboard_offset + source_piece.bitboard_index();
+        let our_occupancies_index: usize = our_color.occupancy_bitboard_index();
+        let their_piece_bitboard_offset: usize = their_color.piece_bitboard_offset();
+        let their_occupancies_index: usize = their_color.occupancy_bitboard_index();
+
+        // Place the piece back it's starting square.
+        match source_piece {
+            PieceType::Pawn => {
+                self.piece_bitboards[our_piece_bitboard_index] = set_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.from_square);
+
+                // Special logic for pawn DEMOTION.
+                match this_move.pawn_promoting_to {
+                    Some(piece_promoted_to) => {
+                        match piece_promoted_to {
+                            PieceType::Queen => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = pop_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
+                            PieceType::Rook => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = pop_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
+                            PieceType::Bishop => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = pop_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
+                            PieceType::Knight => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = pop_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
+                            _ => panic!("Tried to promote to an illegal piece."),
+                        }
+                    },
+                    None => self.piece_bitboards[our_piece_bitboard_index] = pop_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.to_square),
+                }
+                
+            },
+
+            // Every other piece, remove it from the destination, place it at the source.
+            _ => {
+                self.piece_bitboards[our_piece_bitboard_index] = pop_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.to_square);
+                self.piece_bitboards[our_piece_bitboard_index] = set_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.from_square);
+            }
+        }
+
+        // Update our occupancies.
+        self.occupancy_bitboards[our_occupancies_index] = pop_bit(self.occupancy_bitboards[our_occupancies_index], this_move.to_square);
+        self.occupancy_bitboards[our_occupancies_index] = set_bit(self.occupancy_bitboards[our_occupancies_index], this_move.from_square);
+
+        // Update all occupancies, source piece always moves.
+        self.occupancy_bitboards[2] = set_bit(self.occupancy_bitboards[2], this_move.from_square);
+
+        // Figure out if we are capturing.
+        let is_capture = this_move.to_piece_type.is_some();
+        if !is_capture {
+            self.occupancy_bitboards[2] = pop_bit(self.occupancy_bitboards[2], this_move.to_square);
+        } else {
+            let their_piece = this_move.to_piece_type.expect("Should be here, thanks to guard.");
+            let their_piece_bitboard_index = their_piece.bitboard_index() + their_piece_bitboard_offset;
+
+            // Place their piece on the square; and update their occupancies.
+            // self.piece_bitboards[their_piece_bitboard_index] = set_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
+            // self.occupancy_bitboards[their_occupancies_index] = set_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
+            match their_piece {
+                // For pawn captures, handle en-passant.
+                PieceType::Pawn => {
+                    if this_move.is_en_passant_capture {
+
+                        // Remove our pawn from the target square. Normal captures do not need to update this, but en-passant does.
+                        self.occupancy_bitboards[2] = pop_bit(self.occupancy_bitboards[2], this_move.to_square);
+                        let en_passant_target_pawn_index: usize = match their_color {
+                            Color::White => { this_move.to_square - 8 },
+                            Color::Black => { this_move.to_square + 8 },
+                        };
+
+                        // Add their pawn we captured en-passant.
+                        self.piece_bitboards[their_piece_bitboard_offset + their_piece.bitboard_index()] = set_bit(self.piece_bitboards[their_piece_bitboard_offset + their_piece.bitboard_index()], en_passant_target_pawn_index);
+
+                        // Add their occupancy.
+                        self.occupancy_bitboards[their_occupancies_index] = set_bit(self.occupancy_bitboards[their_occupancies_index], en_passant_target_pawn_index);
+
+                        // Add global occupancy.
+                        self.occupancy_bitboards[2] = set_bit(self.occupancy_bitboards[2], en_passant_target_pawn_index);
+                    } else {
+                        // Add that piece from the board.
+                        self.piece_bitboards[their_piece_bitboard_index] = set_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
+
+                        // Update their occupancies.
+                        self.occupancy_bitboards[their_occupancies_index] = set_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
+                    }
+                },
+
+                // For all non-pawn captures...
+                _ => {
+
+                    // Add that piece from the board.
+                    self.piece_bitboards[their_piece_bitboard_index] = set_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
+
+                    // Update their occupancies.
+                    self.occupancy_bitboards[their_occupancies_index] = set_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
+                }
+            }
+        }
+
+        // Lastly, handle castling.
+        match this_move.castle_side {
+            None => (),
+            Some(side) => {
+                let king_from_position = this_move.from_square;
+                let rook_from_position = match side {
+                    CastleSides::Short => king_from_position + 3,
+                    CastleSides::Long => king_from_position - 4,
+                };
+                let rook_to_position = match side {
+                    CastleSides::Short => king_from_position + 1,
+                    CastleSides::Long => king_from_position - 1,
+                };
+
+                // Move our rook back.
+                let rook_bitboard_index = our_piece_bitboard_offset + PieceType::Rook.bitboard_index();
+                self.piece_bitboards[rook_bitboard_index] = set_bit(self.piece_bitboards[rook_bitboard_index], rook_from_position);
+                self.piece_bitboards[rook_bitboard_index] = pop_bit(self.piece_bitboards[rook_bitboard_index], rook_to_position);
+
+                // Update our occupancies.
+                self.occupancy_bitboards[our_occupancies_index] = set_bit(self.occupancy_bitboards[our_occupancies_index], rook_from_position);
+                self.occupancy_bitboards[our_occupancies_index] = pop_bit(self.occupancy_bitboards[our_occupancies_index], rook_to_position);
+
+                // Update global occupancies.
+                self.occupancy_bitboards[2] = set_bit(self.occupancy_bitboards[2], rook_from_position);
+                self.occupancy_bitboards[2] = pop_bit(self.occupancy_bitboards[2], rook_to_position);
+            }
+        }
+
+        // Grant castling rights back if we forfeited them.
+        match our_color {
+            Color::White => {
+                if this_move.removes_castling_rights_short {
+                    self.can_white_castle_short = true;
+                }
+                if this_move.removes_castling_rights_long {
+                    self.can_white_castle_long = true;
+                }
+            },
+            Color::Black => {
+                if this_move.removes_castling_rights_short {
+                    self.can_black_castle_short = true;
+                }
+                if this_move.removes_castling_rights_long {
+                    self.can_black_castle_long = true;
+                }
+            },
+        }
+
+        // Only needed if we are capturing.
+        self.en_passant_target = this_move.last_en_passant_target_coord;
+
+        // Important for checking if move is illegal.
+        self.white_to_move = !self.white_to_move;
+
+        // Debugging!
+        self.debug_verify_board_state(this_move, debug_initial_game_state, "Unmake move");
+    }
+
+
+
 
 
     pub fn is_king_attacked(&self, side_attacked: &Color) -> bool {
@@ -985,7 +1212,7 @@ impl<'a> ChessGame<'a> {
     }
 
     // Meant for users/bots to pick a move, so it is populated with all the data we need.
-    pub fn choose_move_from_legal_move(&self, this_move: &Move) -> Option<Move> {
+    pub fn choose_move_from_legal_move(&mut self, this_move: &Move) -> Option<Move> {
         let moves = self.get_legal_moves();
 
         for m in moves.iter() {
@@ -1002,7 +1229,7 @@ impl<'a> ChessGame<'a> {
         self.legal_moves = self.get_legal_moves();
     }
 
-    pub fn get_legal_moves(&self) -> Vec<Move> {
+    pub fn get_legal_moves(&mut self) -> Vec<Move> {
         let mut moves: Vec<Move> = vec![];
         let mut possible_moves = self.get_psuedo_legal_moves();
         let our_side: &Color;
@@ -1019,16 +1246,17 @@ impl<'a> ChessGame<'a> {
 
         // Try the move, drop it if it's illegal.
         for this_move in possible_moves.iter_mut() {
-            let mut self_copy = self.clone();
-            self_copy.make_move(this_move, false);
+            self.make_move(this_move, false);
 
             // Does the move put us in check?
-            if !self_copy.is_king_attacked(our_side) {
+            if !self.is_king_attacked(our_side) {
 
                 // Does it put them in check?
-                this_move.is_check = Some(self_copy.is_king_attacked(their_side));
+                this_move.is_check = Some(self.is_king_attacked(their_side));
                 moves.push(*this_move);
             }
+
+            self.unmake_move(this_move);
         }
 
         // Sort the moves.

@@ -23,9 +23,18 @@ async fn main() {
     new_game.set_legal_moves();
     //new_game.play_game_vs_bot();
 
-    new_game.print_board();
+    //new_game.print_board();
+
+
+    // Benchmark how long it takes to get a bot move.
+    use std::time::Instant;
+    let now = Instant::now();
+
+
     let bot_move = new_game.get_bot_move();
-    println!("Bot thinks we should play {}", bot_move.move_to_str());
+
+    let elapsed = now.elapsed();
+    println!("Bot thinks we should play {}\n Elapsed: {:.2?}", bot_move.move_to_str(), elapsed);
 
     // new_game.set_legal_moves();
     // new_game.print_board();
