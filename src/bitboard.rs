@@ -1,4 +1,5 @@
 use crate::constants;
+use std::io;
 
 #[derive(Copy, Clone, Debug)]
 pub enum Color {
@@ -170,6 +171,43 @@ pub enum PieceType {
 }
 
 impl PieceType {
+    pub fn piece_base_value(&self) -> i64 {
+        return match self {
+            Self::King => 0,
+            Self::Queen => 900,
+            Self::Rook => 500,
+            Self::Bishop => 320,
+            Self::Knight => 300,
+            Self::Pawn => 100,
+        };
+    }
+
+    pub fn piece_happy_square_value(&self, square: usize, is_white_piece: bool) -> i64 {
+        return match self {
+            Self::King => constants::KING_HAPPY_SQUARES_NON_ENDGAME[square],
+            Self::Queen => constants::QUEEN_HAPPY_SQUARES[square],
+            Self::Rook => constants::ROOK_HAPPY_SQUARES[square],
+            Self::Bishop => constants::BISHOP_HAPPY_SQUARES[square],
+            Self::Knight => constants::KNIGHT_HAPPY_SQUARES[square],
+            Self::Pawn => {
+                if is_white_piece {
+                    return constants::PAWN_HAPPY_SQUARES[square];
+                } else {
+                    // Break the square into it's x and y components; and negate the y component.
+                    let rank: usize = 7 - (square / 8);
+                    let file_number: usize = square % 8;
+
+                    // Rebuild the coordinate.
+                    let new_square: usize = rank * 8 + file_number;
+
+                    // Get the value.
+                    return constants::PAWN_HAPPY_SQUARES[new_square];
+                }
+            },
+        };
+    }
+
+
     pub fn to_char_side_agnostic(&self) -> char {
         return match self {
             Self::King => 'k',
@@ -273,7 +311,7 @@ impl Constants {
 }
 
 // TODO: Research more on lifetime stuff.
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct ChessGame<'a> {
     pub bitboard_constants: &'a Constants,
 
@@ -305,6 +343,8 @@ pub struct ChessGame<'a> {
         2 -> all_occupancies
     */
     pub occupancy_bitboards: [u64; 3],
+
+    pub legal_moves: Vec<Move>,
 }
 
 impl<'a> ChessGame<'a> {
@@ -322,7 +362,44 @@ impl<'a> ChessGame<'a> {
 
             piece_bitboards: [0; 12],
             occupancy_bitboards: [0; 3],
+
+            legal_moves: vec![],
         };
+    }
+
+    pub fn debug_verify_board_state(&self, this_move: &Move, prev_game_state: ChessGame) {
+
+        // Make sure occupancies add up corrrectly.
+        if self.occupancy_bitboards[2] != self.occupancy_bitboards[0] | self.occupancy_bitboards[1] {
+            println!("Previous game state");
+            prev_game_state.print_board();
+            println!("Tried to make move: {:#?}", this_move);
+            // self.print_board();
+            // println!("White occupancies:");
+            // print_bitboard(self.occupancy_bitboards[0]);
+            // println!("Black occupancies:");
+            // print_bitboard(self.occupancy_bitboards[1]);
+            panic!("Occupancy desynced.");
+        }
+
+        // Make sure white pieces add up to occupancies.
+        let mut constructed_occupancies_white = 0;
+        for i in 0..6 {
+            constructed_occupancies_white |= self.piece_bitboards[i];
+        }
+        if self.occupancy_bitboards[0] != constructed_occupancies_white {
+            panic!("White pieces desynced.");
+        }
+
+        let mut constructed_occupancies_black = 0;
+        for i in 6..12 {
+            constructed_occupancies_black |= self.piece_bitboards[i];
+        }
+        if self.occupancy_bitboards[1] != constructed_occupancies_black {
+            panic!("Black pieces desynced.");
+        }
+
+
     }
 
     // Takes all pieces off the board.
@@ -631,14 +708,14 @@ impl<'a> ChessGame<'a> {
     }
 
 
-    pub fn make_move(&mut self, this_move: &Move, debugging: bool) {
+    pub fn make_move(&mut self, this_move: &Move, update_legal_moves: bool) {
+        //let debug_initial_game_state = self.clone();
+
         let source_piece = this_move.from_piece_type.expect("This should always be here.");
 
         // Handle generic captures, and en-passant captures.
-        //let (target_piece,_) = self.get_piece_at_square(this_move.to_square);
         let our_color: Color;
         let their_color: Color;
-
 
         if self.white_to_move {
             our_color = Color::White;
@@ -653,11 +730,6 @@ impl<'a> ChessGame<'a> {
         let our_occupancies_index: usize = our_color.occupancy_bitboard_index();
         let their_piece_bitboard_offset: usize = their_color.piece_bitboard_offset();
         let their_occupancies_index: usize = their_color.occupancy_bitboard_index();
-
-        if debugging {
-            println!("Debug output (start function) {:#?}", this_move);
-            println!("Our Color: {:#?}\n Their Color: {:#?}", our_color, their_color);
-        }
 
         // Remove our piece from it's starting square, and place it in the new spot.
         // This does not handle castling, and en-passant logic.
@@ -776,20 +848,21 @@ impl<'a> ChessGame<'a> {
             }
         }
 
-
         // Forfeiting castling rights.
         match our_color {
             Color::White => {
                 if this_move.removes_castling_rights_short {
                     self.can_white_castle_short = false;
-                } else if this_move.removes_castling_rights_long {
+                }
+                if this_move.removes_castling_rights_long {
                     self.can_white_castle_long = false;
                 }
             },
             Color::Black => {
                 if this_move.removes_castling_rights_short {
                     self.can_black_castle_short = false;
-                } else if this_move.removes_castling_rights_long {
+                }
+                if this_move.removes_castling_rights_long {
                     self.can_black_castle_long = false;
                 }
             },
@@ -800,6 +873,14 @@ impl<'a> ChessGame<'a> {
 
         // Important for checking if move is illegal.
         self.white_to_move = !self.white_to_move;
+
+        if update_legal_moves {
+            // Used to find bugs.
+            //self.debug_verify_board_state(this_move, debug_initial_game_state);
+
+            // Update our moves!
+            self.set_legal_moves();
+        }
     }
 
 
@@ -812,6 +893,96 @@ impl<'a> ChessGame<'a> {
         };
     }
 
+
+    pub fn is_checkmate(&self) -> bool {
+        // If you have a legal move, you are not in checkmate.
+        if self.legal_moves.len() != 0 {
+            return false;
+        }
+
+        let our_color: Color;
+        if self.white_to_move {
+            our_color = Color::White;
+        } else {
+            our_color = Color::Black;
+        }
+
+        return self.is_king_attacked(&our_color);
+    }
+
+    pub fn is_stalemate(&self) -> bool {
+        // If you have a legal move, you are not in checkmate.
+        if self.legal_moves.len() != 0 {
+            return false;
+        }
+
+        let our_color: Color;
+        if self.white_to_move {
+            our_color = Color::White;
+        } else {
+            our_color = Color::Black;
+        }
+
+        return !self.is_king_attacked(&our_color);
+    }
+
+
+    pub fn evaluate_board(&self) -> i64 {
+        if self.is_stalemate() {
+            return 0;
+        }
+
+        if self.is_checkmate() {
+            if self.white_to_move {
+                return std::i64::MAX;
+            } else {
+                return std::i64::MIN;
+            }
+        }
+
+        // Variables shared by both functions.
+        let mut square: usize;
+        let mut occupancies: u64;
+        let mut white_piece_value_total: i64 = 0;
+        let mut black_piece_value_total: i64 = 0;
+
+
+        // Add up white pieces.
+        occupancies = self.occupancy_bitboards[Color::White.occupancy_bitboard_index()];
+        while occupancies != 0 {
+            square = get_lsb_index(occupancies).expect("Guard clause.");
+            let (piece_wrapped, _) = self.get_piece_at_square(square);
+            let piece = piece_wrapped.expect("Not empty (white piece).");
+            white_piece_value_total += piece.piece_base_value();
+            white_piece_value_total += piece.piece_happy_square_value(square, true);
+            occupancies = pop_bit(occupancies, square)
+        }
+
+        // Add up black pieces.
+        occupancies = self.occupancy_bitboards[Color::Black.occupancy_bitboard_index()];
+        while occupancies != 0 {
+            square = get_lsb_index(occupancies).expect("Guard clause.");
+            let (piece_wrapped, _) = self.get_piece_at_square(square);
+
+            if piece_wrapped.is_none() {
+                println!("Expecting piece at square {}; but did not find it.", square);
+                println!("Position:");
+                self.print_board();
+
+                println!("Black occupancies:");
+                print_bitboard(self.occupancy_bitboards[1]);
+            }
+
+            let piece = piece_wrapped.expect("Not empty (black piece).");
+            black_piece_value_total += piece.piece_base_value();
+            black_piece_value_total += piece.piece_happy_square_value(square, false);
+            occupancies = pop_bit(occupancies, square)
+        }
+
+
+        // Add up the pieces, return the sum?
+        return white_piece_value_total - black_piece_value_total;
+    }
 
     // Meant for users/bots to pick a move, so it is populated with all the data we need.
     pub fn choose_move_from_legal_move(&self, this_move: &Move) -> Option<Move> {
@@ -826,27 +997,63 @@ impl<'a> ChessGame<'a> {
         return None;
     }
 
+    pub fn set_legal_moves(&mut self) {
+        self.legal_moves.clear();
+        self.legal_moves = self.get_legal_moves();
+    }
 
     pub fn get_legal_moves(&self) -> Vec<Move> {
         let mut moves: Vec<Move> = vec![];
-        let possible_moves = self.get_psuedo_legal_moves();
-        let our_side;
+        let mut possible_moves = self.get_psuedo_legal_moves();
+        let our_side: &Color;
+        let their_side: &Color;
 
         if self.white_to_move {
             our_side = &Color::White;
+            their_side = &Color::Black;
         } else {
             our_side = &Color::Black;
+            their_side = &Color::White;
         }
 
 
         // Try the move, drop it if it's illegal.
-        for this_move in possible_moves.iter() {
+        for this_move in possible_moves.iter_mut() {
             let mut self_copy = self.clone();
             self_copy.make_move(this_move, false);
+
+            // Does the move put us in check?
             if !self_copy.is_king_attacked(our_side) {
+
+                // Does it put them in check?
+                this_move.is_check = Some(self_copy.is_king_attacked(their_side));
                 moves.push(*this_move);
             }
         }
+
+        // Sort the moves.
+        moves.sort_unstable_by_key(|m| {
+            let is_check = m.is_check == Some(true);
+            let is_capture = m.to_piece_type.is_some();
+
+            // Look at checks and captures.
+            if is_check && is_capture {
+                return 1;
+            }
+
+            // Look at checks.
+            if is_check {
+                return 2;
+            }
+
+            // Look at captures.
+            if is_capture {
+                return 3;
+            }
+
+            // Default value of move.
+            return 4;
+        });
 
         return moves;
     }
@@ -867,12 +1074,11 @@ impl<'a> ChessGame<'a> {
     }
 
     pub fn print_legal_moves(&self) {
-        let moves = self.get_legal_moves();
-        for m in moves.iter() {
+        for m in self.legal_moves.iter() {
             print!("{} ", m.move_to_str());
         }
-        if moves.len() == 0 {
-            println!("There are no legal moves...");
+        if self.legal_moves.len() == 0 {
+            print!("There are no legal moves...");
         }
         print!("\n");
     }
@@ -1470,6 +1676,163 @@ impl<'a> ChessGame<'a> {
         }
 
         return moves;
+    }
+
+
+
+    pub fn play_game_vs_bot(&mut self) {
+        //self.import_fen(INITIAL_GAME_STATE_FEN);
+        //self.import_fen("rnb1kbnr/pppp1ppp/11111111/1111p111/1111PP1q/111111P1/PPPP111P/RNBQKBNR b");
+        //self.import_fen("rnbqkbnr/pppp1ppp/8/4p3/5PP1/8/PPPPP2P/RNBQKBNR b"); // M1 for black.
+        //self.import_fen("rnbqkbnr/p1pppppp/8/1p3P2/8/8/PPPPP1PP/RNBQKBNR b KQkq - 0 2"); // Testing for en-passant.
+        //self.import_fen("rnbqkbnr/p1pp1ppp/8/1p2pP2/8/8/PPPPP1PP/RNBQKBNR w KQkq e6 0 3"); // Direct capture allowed.
+        //self.import_fen("rnbqkbnr/pppppppp/8/8/4B3/4N3/PPPPPPPP/RNBQK2R w KQkq - 0 1"); // Can castle short?
+        //self.import_fen("rnbqkbnr/pppppppp/8/8/1QN1B3/2B1N3/PPPPPPPP/R3K2R w KQkq - 0 1"); // Can castle long and short.
+        //self.import_fen("rnbqk3/1pppp1P1/7P/5P2/1QN1B3/1PB1N3/pPPPP3/4K2R w Kq - 0 1"); // Pawn promotion.
+        //self.update_legal_moves();
+        println!("Starting a new game.");
+
+        let mut iter_counter: i32 = 0;
+        loop {
+            // Print the board.
+            self.print_board();
+
+            // See if game is over.
+            if self.legal_moves.len() == 0 {
+                //self.state.print_game_state();
+                //self.print_debug_game_state();
+                println!("Game over, no legal moves.");
+                break;
+            }
+
+            // Player move.
+            println!("It is your turn. Enter a move.");
+
+            // Read the user input.
+            let mut input = String::new();
+            io::stdin()
+                .read_line(&mut input)
+                .expect("Failed to readline. Not sure what went wrong.");
+
+            // Remove endline.
+            input = String::from(input.trim());
+
+            // TEMPORARY DEBUG OUTPUT FEN
+            if input == "export" {
+                //println!("{}", self.export_fen());
+                println!("Not implemented yet.");
+                continue;
+            }
+
+            // TEMPORARY DEBUG OUTPUT GAME STATE
+            if input == "debug" {
+                // self.print_debug_game_state();
+                println!("Not implemented yet.");
+                continue;
+            }
+
+            let user_move_raw = match Move::str_to_move(&input) {
+                Ok(m) => m,
+                Err(msg) => {
+                    println!("{}", msg);
+                    continue;
+                }
+            };
+
+            // Grab the move from the game, it has more data (capture, en-passant, etc).
+            let user_move: Option<Move> = self.choose_move_from_legal_move(&user_move_raw);
+
+            match user_move {
+                Some(m) => self.make_move(&m, true),
+                None => {
+                    println!("That is not one of your legal moves. Try again.");
+                    self.print_legal_moves();
+                    continue;
+                }
+            }
+
+            println!("Made the move...");
+            self.print_board();
+            //self.print_debug_game_state();
+            if self.legal_moves.len() == 0 {
+                println!("Game over, no more legal moves.");
+                break;
+            }
+
+            // Let the bot make a move.
+            let bot_move = self.get_bot_move();
+            println!("Bot is playing {}", bot_move.move_to_str());
+            self.make_move(&bot_move, true);
+
+            // Temporary guard for oopsies...
+            iter_counter += 1;
+            if iter_counter > 1000 {
+                panic!("Dev likely did something wrong, hit 1000 iterations.");
+            }
+        }
+    }
+
+    pub fn get_bot_move(&self) -> Move {
+        if self.legal_moves.len() == 0 {
+            panic!("Something has gone wrong, called get_bot_move when no legal moves were available...");
+        }
+
+        let mut best_eval: i64;
+        let mut best_move: Move = self.legal_moves[0];
+        if self.white_to_move {
+            best_eval = std::i64::MIN;
+        } else {
+            best_eval = std::i64::MAX;
+        }
+
+        for legal_move in self.legal_moves.iter() {
+            let mut game_copy = self.clone();
+            game_copy.make_move(legal_move, true);
+            let minimax_eval = game_copy.minimax(4, std::i64::MIN, std::i64::MAX);
+            if self.white_to_move && minimax_eval > best_eval {
+                best_eval = minimax_eval;
+                best_move = *legal_move;
+            } else if !self.white_to_move && minimax_eval < best_eval {
+                best_eval = minimax_eval;
+                best_move = *legal_move;
+            }
+        }
+
+        return best_move;
+    }
+
+    pub fn minimax(&self, depth: u32, mut alpha: i64, mut beta: i64) -> i64 {
+        if depth == 0 || self.is_checkmate() || self.is_stalemate() {
+            return self.evaluate_board();
+        }
+
+        // This code looks terrible...
+        let mut evaluation: i64;
+        if self.white_to_move {
+            evaluation = std::i64::MIN;
+            for legal_move in self.legal_moves.iter() {
+                let mut game_copy = self.clone();
+                game_copy.make_move(legal_move, true);
+                evaluation = i64::max(evaluation, game_copy.minimax(depth - 1, alpha, beta));
+                if evaluation > beta {
+                    break;
+                }
+                alpha = i64::max(alpha, evaluation);
+            }
+        } else {
+            evaluation = std::i64::MAX;
+            for legal_move in self.legal_moves.iter() {
+                let mut game_copy = self.clone();
+                game_copy.make_move(legal_move, true);
+                evaluation = i64::min(evaluation, game_copy.minimax(depth - 1, alpha, beta));
+                if evaluation < alpha {
+                    break;
+                }
+                beta = i64::min(beta, evaluation);
+            }
+        }
+
+        return evaluation;
     }
 }
 
