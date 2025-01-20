@@ -72,11 +72,14 @@ pub struct Move {
 
     // Castling
     pub castle_side: Option<CastleSides>,
-    pub removes_castling_rights_short: bool,
-    pub removes_castling_rights_long: bool,
+
 
     // Populated later, used for move sorting.
     pub is_check: Option<bool>,
+    pub removes_white_castling_rights_short: Option<bool>,
+    pub removes_white_castling_rights_long: Option<bool>,
+    pub removes_black_castling_rights_short: Option<bool>,
+    pub removes_black_castling_rights_long: Option<bool>,
 }
 
 impl Move {
@@ -91,8 +94,10 @@ impl Move {
             is_en_passant_capture: false,
             pawn_promoting_to: None,
             castle_side: None,
-            removes_castling_rights_short: false,
-            removes_castling_rights_long: false,
+            removes_white_castling_rights_short: None,
+            removes_white_castling_rights_long: None,
+            removes_black_castling_rights_short: None,
+            removes_black_castling_rights_long: None,
             is_check: None,
         }
     }
@@ -898,23 +903,17 @@ impl<'a> ChessGame<'a> {
         }
 
         // Forfeiting castling rights.
-        match our_color {
-            Color::White => {
-                if this_move.removes_castling_rights_short {
-                    self.can_white_castle_short = false;
-                }
-                if this_move.removes_castling_rights_long {
-                    self.can_white_castle_long = false;
-                }
-            },
-            Color::Black => {
-                if this_move.removes_castling_rights_short {
-                    self.can_black_castle_short = false;
-                }
-                if this_move.removes_castling_rights_long {
-                    self.can_black_castle_long = false;
-                }
-            },
+        if this_move.removes_white_castling_rights_short == Some(true) {
+            self.can_white_castle_short = false;
+        }
+        if this_move.removes_white_castling_rights_long == Some(true) {
+            self.can_white_castle_long = false;
+        }
+        if this_move.removes_black_castling_rights_short == Some(true) {
+            self.can_black_castle_short = false;
+        }
+        if this_move.removes_black_castling_rights_long == Some(true) {
+            self.can_black_castle_long = false;
         }
 
         // Only needed if we are capturing.
@@ -929,11 +928,11 @@ impl<'a> ChessGame<'a> {
             
 
             // Update our moves!
-            self.set_legal_moves();
+            self.set_legal_moves(None);
         }
 
         // Used to find bugs.
-        self.debug_verify_board_state(this_move, debug_initial_game_state, "Make Move");
+        //self.debug_verify_board_state(this_move, debug_initial_game_state, "Make Move");
     }
 
 
@@ -1078,23 +1077,17 @@ impl<'a> ChessGame<'a> {
         }
 
         // Grant castling rights back if we forfeited them.
-        match our_color {
-            Color::White => {
-                if this_move.removes_castling_rights_short {
-                    self.can_white_castle_short = true;
-                }
-                if this_move.removes_castling_rights_long {
-                    self.can_white_castle_long = true;
-                }
-            },
-            Color::Black => {
-                if this_move.removes_castling_rights_short {
-                    self.can_black_castle_short = true;
-                }
-                if this_move.removes_castling_rights_long {
-                    self.can_black_castle_long = true;
-                }
-            },
+        if this_move.removes_white_castling_rights_short == Some(true) {
+            self.can_white_castle_short = true;
+        }
+        if this_move.removes_white_castling_rights_long == Some(true) {
+            self.can_white_castle_long = true;
+        }
+        if this_move.removes_black_castling_rights_short == Some(true) {
+            self.can_black_castle_short = true;
+        }
+        if this_move.removes_black_castling_rights_long == Some(true) {
+            self.can_black_castle_long = true;
         }
 
         // Only needed if we are capturing.
@@ -1104,7 +1097,7 @@ impl<'a> ChessGame<'a> {
         self.white_to_move = !self.white_to_move;
 
         // Debugging!
-        self.debug_verify_board_state(this_move, debug_initial_game_state, "Unmake move");
+        //self.debug_verify_board_state(this_move, debug_initial_game_state, "Unmake move");
     }
 
 
@@ -1155,18 +1148,6 @@ impl<'a> ChessGame<'a> {
 
 
     pub fn evaluate_board(&self) -> i64 {
-        if self.is_stalemate() {
-            return 0;
-        }
-
-        if self.is_checkmate() {
-            if self.white_to_move {
-                return std::i64::MAX;
-            } else {
-                return std::i64::MIN;
-            }
-        }
-
         // Variables shared by both functions.
         let mut square: usize;
         let mut occupancies: u64;
@@ -1224,9 +1205,12 @@ impl<'a> ChessGame<'a> {
         return None;
     }
 
-    pub fn set_legal_moves(&mut self) {
+    pub fn set_legal_moves(&mut self, moves: Option<Vec<Move>>) {
         self.legal_moves.clear();
-        self.legal_moves = self.get_legal_moves();
+        self.legal_moves = match moves {
+            Some(m) => m,
+            None => self.get_legal_moves()
+        };
     }
 
     pub fn get_legal_moves(&mut self) -> Vec<Move> {
@@ -1246,6 +1230,95 @@ impl<'a> ChessGame<'a> {
 
         // Try the move, drop it if it's illegal.
         for this_move in possible_moves.iter_mut() {
+
+            // How does this move impact castling rights?
+            this_move.removes_white_castling_rights_short = Some(false);
+            this_move.removes_white_castling_rights_long = Some(false);
+            this_move.removes_black_castling_rights_short = Some(false);
+            this_move.removes_black_castling_rights_long = Some(false);
+            
+            // Revoke our castling rights based on our move.
+            match our_side {
+                Color::White => {
+                    if self.can_white_castle_short {
+                        // If we are moving the king, remove this right.
+                        if this_move.from_piece_type == Some(PieceType::King) {
+                            this_move.removes_white_castling_rights_short = Some(true);
+                        }
+
+                        // If we are moving our rook from it's starting square, remove this right.
+                        else if this_move.from_piece_type == Some(PieceType::Rook) && this_move.from_square == 63 {
+                            this_move.removes_white_castling_rights_short = Some(true);
+                        }
+                    }
+
+                    if self.can_white_castle_long {
+                        // If we are moving the king, remove this right.
+                        if this_move.from_piece_type == Some(PieceType::King) {
+                            this_move.removes_white_castling_rights_long = Some(true);
+                        }
+
+                        // If we are moving our rook from it's starting square, remove this right.
+                        else if this_move.from_piece_type == Some(PieceType::Rook) && this_move.from_square == 56 {
+                            this_move.removes_white_castling_rights_long = Some(true);
+                        }
+                    }
+                },
+                Color::Black => {
+                    if self.can_black_castle_short {
+                        // If we are moving the king, remove this right.
+                        if this_move.from_piece_type == Some(PieceType::King) {
+                            this_move.removes_black_castling_rights_short = Some(true);
+                        }
+
+                        // If we are moving our rook from it's starting square, remove this right.
+                        else if this_move.from_piece_type == Some(PieceType::Rook) && this_move.from_square == 7 {
+                            this_move.removes_black_castling_rights_short = Some(true);
+                        }
+                    }
+
+                    if self.can_black_castle_long {
+                        // If we are moving the king, remove this right.
+                        if this_move.from_piece_type == Some(PieceType::King) {
+                            this_move.removes_black_castling_rights_long = Some(true);
+                        }
+
+                        // If we are moving our rook from it's starting square, remove this right.
+                        else if this_move.from_piece_type == Some(PieceType::Rook) && this_move.from_square == 0 {
+                            this_move.removes_black_castling_rights_long = Some(true);
+                        }
+                    }
+                }
+            }
+
+            // Handle the edge case where we are capturing opponents rook on it's starting square. We need to revoke rights.
+            if this_move.to_piece_type == Some(PieceType::Rook) {
+                match their_side {
+                    Color::Black => {
+                        // If black can castle short, but we are capturing the rook on it's starting square; revoke.
+                        if self.can_black_castle_short && this_move.to_square == 7 {
+                            this_move.removes_black_castling_rights_short = Some(true);
+                        }
+
+                        // If black can castle long, but we are capturing the rook on it's starting square; revoke.
+                        else if self.can_black_castle_long && this_move.to_square == 0 {
+                            this_move.removes_black_castling_rights_long = Some(true);
+                        }
+                    }
+                    Color::White => {
+                        // If white can castle short, but we are capturing the rook on it's starting square; revoke.
+                        if self.can_white_castle_short && this_move.to_square == 56 {
+                            this_move.removes_white_castling_rights_short = Some(true);
+                        }
+
+                        // If white can castle long, but we are capturing the rook on it's starting square; revoke.
+                        else if self.can_white_castle_long && this_move.to_square == 63 {
+                            this_move.removes_white_castling_rights_long = Some(true);
+                        }
+                    }
+                }
+            }
+
             self.make_move(this_move, false);
 
             // Does the move put us in check?
@@ -1319,23 +1392,18 @@ impl<'a> ChessGame<'a> {
         let mut slider_piece_attacks: u64;
         let mut quiet_moves: u64;
         let mut captures: u64;
-        let mut removes_castling_rights_short: bool;
-        let mut removes_castling_rights_long: bool;
         let mut to_piece_type: Option<PieceType>;
 
         let all_occupancies: u64 = self.occupancy_bitboards[2];
         let their_occupancies: u64;
         let our_piece_bitboard_offset: usize;
-        let rook_square_offset: usize;
 
         if self.white_to_move {
             their_occupancies = self.occupancy_bitboards[Color::Black.occupancy_bitboard_index()];
             our_piece_bitboard_offset = Color::White.piece_bitboard_offset();
-            rook_square_offset = 56;
         } else {
             their_occupancies = self.occupancy_bitboards[Color::White.occupancy_bitboard_index()];
             our_piece_bitboard_offset = Color::Black.piece_bitboard_offset();
-            rook_square_offset = 0;
         }
 
         slider_pieces = match slider_piece_type {
@@ -1353,13 +1421,9 @@ impl<'a> ChessGame<'a> {
             }
         };
 
-        // println!("Our slider pieces bitboard:");
-        // print_bitboard(slider_pieces);
 
         while slider_pieces != 0 {
             source_square = get_lsb_index(slider_pieces).expect("This should not happen.");
-            removes_castling_rights_short = false;
-            removes_castling_rights_long = false;
 
             // Get moves and captures seperately.
             match slider_piece_type {
@@ -1368,17 +1432,6 @@ impl<'a> ChessGame<'a> {
                 }
                 PieceType::Rook => {
                     slider_piece_attacks = self.get_rook_attacks(source_square, all_occupancies);
-
-                    // We need to check if this move would remove castling rights.
-                    if source_square == rook_square_offset && self.white_to_move && self.can_white_castle_long {
-                        removes_castling_rights_long = true;
-                    } else if source_square == rook_square_offset + 7 && self.white_to_move && self.can_white_castle_short {
-                        removes_castling_rights_short = true;
-                    } else if source_square == rook_square_offset && !self.white_to_move && self.can_black_castle_long {
-                        removes_castling_rights_long = true;
-                    } else if source_square == rook_square_offset + 7 && !self.white_to_move && self.can_black_castle_short {
-                        removes_castling_rights_short = true;
-                    }
                 }
                 PieceType::Bishop => {
                     slider_piece_attacks = self.get_bishop_attacks(source_square, all_occupancies);
@@ -1403,8 +1456,10 @@ impl<'a> ChessGame<'a> {
                     is_en_passant_capture: false,
                     is_check: None,
                     pawn_promoting_to: None,
-                    removes_castling_rights_short: removes_castling_rights_short,
-                    removes_castling_rights_long: removes_castling_rights_long,
+                    removes_white_castling_rights_short: None,
+                    removes_white_castling_rights_long: None,
+                    removes_black_castling_rights_short: None,
+                    removes_black_castling_rights_long: None,
                     castle_side: None,
                 });
                 quiet_moves = pop_bit(quiet_moves, target_square);
@@ -1424,8 +1479,10 @@ impl<'a> ChessGame<'a> {
                     is_en_passant_capture: false,
                     is_check: None,
                     pawn_promoting_to: None,
-                    removes_castling_rights_short: removes_castling_rights_short,
-                    removes_castling_rights_long: removes_castling_rights_long,
+                    removes_white_castling_rights_short: None,
+                    removes_white_castling_rights_long: None,
+                    removes_black_castling_rights_short: None,
+                    removes_black_castling_rights_long: None,
                     castle_side: None,
                 });
                 captures = pop_bit(captures, target_square);
@@ -1475,8 +1532,10 @@ impl<'a> ChessGame<'a> {
                     is_en_passant_capture: false,
                     pawn_promoting_to: None,
                     castle_side: None,
-                    removes_castling_rights_short: false,
-                    removes_castling_rights_long: false,
+                    removes_white_castling_rights_short: None,
+                    removes_white_castling_rights_long: None,
+                    removes_black_castling_rights_short: None,
+                    removes_black_castling_rights_long: None,
                 });
                 quiet_moves = pop_bit(quiet_moves, target_square);
             }
@@ -1496,8 +1555,10 @@ impl<'a> ChessGame<'a> {
                     is_en_passant_capture: false,
                     pawn_promoting_to: None,
                     castle_side: None,
-                    removes_castling_rights_short: false,
-                    removes_castling_rights_long: false,
+                    removes_white_castling_rights_short: None,
+                    removes_white_castling_rights_long: None,
+                    removes_black_castling_rights_short: None,
+                    removes_black_castling_rights_long: None,
                 });
                 captures = pop_bit(captures, target_square);
             }
@@ -1559,8 +1620,10 @@ impl<'a> ChessGame<'a> {
                 is_en_passant_capture: false,
                 pawn_promoting_to: None,
                 castle_side: None,
-                removes_castling_rights_short: can_castle_short,
-                removes_castling_rights_long: can_castle_long,
+                removes_white_castling_rights_short: None,
+                removes_white_castling_rights_long: None,
+                removes_black_castling_rights_short: None,
+                removes_black_castling_rights_long: None,
             });
             quiet_moves = pop_bit(quiet_moves, target_square);
         }
@@ -1581,8 +1644,10 @@ impl<'a> ChessGame<'a> {
                 is_en_passant_capture: false,
                 pawn_promoting_to: None,
                 castle_side: None,
-                removes_castling_rights_short: can_castle_short,
-                removes_castling_rights_long: can_castle_long,
+                removes_white_castling_rights_short: None,
+                removes_white_castling_rights_long: None,
+                removes_black_castling_rights_short: None,
+                removes_black_castling_rights_long: None,
             });
 
             attacks = pop_bit(attacks, target_square);
@@ -1611,8 +1676,10 @@ impl<'a> ChessGame<'a> {
                     is_en_passant_capture: false,
                     pawn_promoting_to: None,
                     castle_side: Some(CastleSides::Short),
-                    removes_castling_rights_short: can_castle_short,
-                    removes_castling_rights_long: can_castle_long,
+                    removes_white_castling_rights_short: None,
+                    removes_white_castling_rights_long: None,
+                    removes_black_castling_rights_short: None,
+                    removes_black_castling_rights_long: None,
                 });
             }
         }
@@ -1639,8 +1706,10 @@ impl<'a> ChessGame<'a> {
                     is_en_passant_capture: false,
                     pawn_promoting_to: None,
                     castle_side: Some(CastleSides::Long),
-                    removes_castling_rights_short: can_castle_short,
-                    removes_castling_rights_long: can_castle_long,
+                    removes_white_castling_rights_short: None,
+                    removes_white_castling_rights_long: None,
+                    removes_black_castling_rights_short: None,
+                    removes_black_castling_rights_long: None,
                 });
             }
         }
@@ -1706,8 +1775,10 @@ impl<'a> ChessGame<'a> {
                         is_en_passant_capture: false,
                         pawn_promoting_to: Some(PieceType::Queen),
                         castle_side: None,
-                        removes_castling_rights_short: false,
-                        removes_castling_rights_long: false,
+                        removes_white_castling_rights_short: None,
+                        removes_white_castling_rights_long: None,
+                        removes_black_castling_rights_short: None,
+                        removes_black_castling_rights_long: None,
                     });
                     moves.push(Move {
                         from_square: source_square,
@@ -1720,8 +1791,10 @@ impl<'a> ChessGame<'a> {
                         is_en_passant_capture: false,
                         pawn_promoting_to: Some(PieceType::Rook),
                         castle_side: None,
-                        removes_castling_rights_short: false,
-                        removes_castling_rights_long: false,
+                        removes_white_castling_rights_short: None,
+                        removes_white_castling_rights_long: None,
+                        removes_black_castling_rights_short: None,
+                        removes_black_castling_rights_long: None,
                     });
                     moves.push(Move {
                         from_square: source_square,
@@ -1734,8 +1807,10 @@ impl<'a> ChessGame<'a> {
                         is_en_passant_capture: false,
                         pawn_promoting_to: Some(PieceType::Bishop),
                         castle_side: None,
-                        removes_castling_rights_short: false,
-                        removes_castling_rights_long: false,
+                        removes_white_castling_rights_short: None,
+                        removes_white_castling_rights_long: None,
+                        removes_black_castling_rights_short: None,
+                        removes_black_castling_rights_long: None,
                     });
                     moves.push(Move {
                         from_square: source_square,
@@ -1748,8 +1823,10 @@ impl<'a> ChessGame<'a> {
                         is_en_passant_capture: false,
                         pawn_promoting_to: Some(PieceType::Knight),
                         castle_side: None,
-                        removes_castling_rights_short: false,
-                        removes_castling_rights_long: false,
+                        removes_white_castling_rights_short: None,
+                        removes_white_castling_rights_long: None,
+                        removes_black_castling_rights_short: None,
+                        removes_black_castling_rights_long: None,
                     });
                 } else {
                     moves.push(Move {
@@ -1763,8 +1840,10 @@ impl<'a> ChessGame<'a> {
                         is_en_passant_capture: false,
                         pawn_promoting_to: None,
                         castle_side: None,
-                        removes_castling_rights_short: false,
-                        removes_castling_rights_long: false,
+                        removes_white_castling_rights_short: None,
+                        removes_white_castling_rights_long: None,
+                        removes_black_castling_rights_short: None,
+                        removes_black_castling_rights_long: None,
                     });
 
                     // Check for the double move.
@@ -1784,8 +1863,10 @@ impl<'a> ChessGame<'a> {
                             is_en_passant_capture: false,
                             pawn_promoting_to: None,
                             castle_side: None,
-                            removes_castling_rights_short: false,
-                            removes_castling_rights_long: false,
+                            removes_white_castling_rights_short: None,
+                            removes_white_castling_rights_long: None,
+                            removes_black_castling_rights_short: None,
+                            removes_black_castling_rights_long: None,
                         });
                     }
                 }
@@ -1808,8 +1889,10 @@ impl<'a> ChessGame<'a> {
                         is_en_passant_capture: false,
                         pawn_promoting_to: Some(PieceType::Queen),
                         castle_side: None,
-                        removes_castling_rights_short: false,
-                        removes_castling_rights_long: false,
+                        removes_white_castling_rights_short: None,
+                        removes_white_castling_rights_long: None,
+                        removes_black_castling_rights_short: None,
+                        removes_black_castling_rights_long: None,
                     });
                     moves.push(Move {
                         from_square: source_square,
@@ -1822,8 +1905,10 @@ impl<'a> ChessGame<'a> {
                         is_en_passant_capture: false,
                         pawn_promoting_to: Some(PieceType::Rook),
                         castle_side: None,
-                        removes_castling_rights_short: false,
-                        removes_castling_rights_long: false,
+                        removes_white_castling_rights_short: None,
+                        removes_white_castling_rights_long: None,
+                        removes_black_castling_rights_short: None,
+                        removes_black_castling_rights_long: None,
                     });
                     moves.push(Move {
                         from_square: source_square,
@@ -1836,8 +1921,10 @@ impl<'a> ChessGame<'a> {
                         is_en_passant_capture: false,
                         pawn_promoting_to: Some(PieceType::Bishop),
                         castle_side: None,
-                        removes_castling_rights_short: false,
-                        removes_castling_rights_long: false,
+                        removes_white_castling_rights_short: None,
+                        removes_white_castling_rights_long: None,
+                        removes_black_castling_rights_short: None,
+                        removes_black_castling_rights_long: None,
                     });
                     moves.push(Move {
                         from_square: source_square,
@@ -1850,8 +1937,10 @@ impl<'a> ChessGame<'a> {
                         is_en_passant_capture: false,
                         pawn_promoting_to: Some(PieceType::Knight),
                         castle_side: None,
-                        removes_castling_rights_short: false,
-                        removes_castling_rights_long: false,
+                        removes_white_castling_rights_short: None,
+                        removes_white_castling_rights_long: None,
+                        removes_black_castling_rights_short: None,
+                        removes_black_castling_rights_long: None,
                     });
                 } else {
                     moves.push(Move {
@@ -1865,8 +1954,10 @@ impl<'a> ChessGame<'a> {
                         is_en_passant_capture: false,
                         pawn_promoting_to: None,
                         castle_side: None,
-                        removes_castling_rights_short: false,
-                        removes_castling_rights_long: false,
+                        removes_white_castling_rights_short: None,
+                        removes_white_castling_rights_long: None,
+                        removes_black_castling_rights_short: None,
+                        removes_black_castling_rights_long: None,
                     });
                 }
                 attacks = pop_bit(attacks, target_square);
@@ -1890,8 +1981,10 @@ impl<'a> ChessGame<'a> {
                             is_en_passant_capture: true,
                             pawn_promoting_to: None,
                             castle_side: None,
-                            removes_castling_rights_short: false,
-                            removes_castling_rights_long: false,
+                            removes_white_castling_rights_short: None,
+                            removes_white_castling_rights_long: None,
+                            removes_black_castling_rights_short: None,
+                            removes_black_castling_rights_long: None,
                         });
                     }
                 }
@@ -2000,7 +2093,7 @@ impl<'a> ChessGame<'a> {
         }
     }
 
-    pub fn get_bot_move(&self) -> Move {
+    pub fn get_bot_move(&mut self) -> Move {
         if self.legal_moves.len() == 0 {
             panic!("Something has gone wrong, called get_bot_move when no legal moves were available...");
         }
@@ -2013,7 +2106,29 @@ impl<'a> ChessGame<'a> {
             best_eval = std::i64::MAX;
         }
 
-        for legal_move in self.legal_moves.iter() {
+        // May be an issue?
+        let temp_legal_move_clone = self.legal_moves.clone();
+        for legal_move in temp_legal_move_clone.iter() {
+            // let mut game_copy = self.clone();
+            // game_copy.make_move(legal_move, true);
+            // Make the move, but don't update legal moves?
+            // self.make_move(legal_move, true);
+
+            // // Get the new legal moves in this position.
+            // //let new_position_moves = self.get_legal_moves();
+            // let minimax_eval = self.minimax(4, std::i64::MIN, std::i64::MAX);
+            // if self.white_to_move && minimax_eval > best_eval {
+            //     best_eval = minimax_eval;
+            //     best_move = *legal_move;
+            // } else if !self.white_to_move && minimax_eval < best_eval {
+            //     best_eval = minimax_eval;
+            //     best_move = *legal_move;
+            // }
+
+            // self.unmake_move(legal_move);
+
+
+
             let mut game_copy = self.clone();
             game_copy.make_move(legal_move, true);
             let minimax_eval = game_copy.minimax(4, std::i64::MIN, std::i64::MAX);
@@ -2029,39 +2144,215 @@ impl<'a> ChessGame<'a> {
         return best_move;
     }
 
-    pub fn minimax(&self, depth: u32, mut alpha: i64, mut beta: i64) -> i64 {
-        if depth == 0 || self.is_checkmate() || self.is_stalemate() {
+    pub fn get_bot_move_debug(&mut self) -> Move {
+        if self.legal_moves.len() == 0 {
+            panic!("Something has gone wrong, called get_bot_move when no legal moves were available...");
+        }
+
+        let (evaluation, best_move) = self.minimax_debug(4, std::i64::MIN, std::i64::MAX);
+
+        println!("Best move evaluation {evaluation}");
+
+
+        return best_move.unwrap();
+    }
+
+
+
+    pub fn minimax(&mut self, depth: u32, mut alpha: i64, mut beta: i64) -> i64 {
+        if self.legal_moves.len() == 0 {
+            if self.white_to_move {
+                if self.is_king_attacked(&Color::White) {
+                    return std::i64::MIN;
+                } else {
+                    return 0;
+                }
+            } else {
+                if self.is_king_attacked(&Color::Black) {
+                    return std::i64::MAX;
+                } else {
+                    return 0;
+                }
+            }
+        }
+
+        if depth == 0 {
             return self.evaluate_board();
         }
 
-        // This code looks terrible...
+        // Clone legal moves? Bad?
+        let temp_legal_move_clone = self.legal_moves.clone();
+
         let mut evaluation: i64;
         if self.white_to_move {
             evaluation = std::i64::MIN;
-            for legal_move in self.legal_moves.iter() {
+            for legal_move in temp_legal_move_clone.iter() {
+                // Unmake move approach.
+                // self.make_move(legal_move, true);
+                // evaluation = i64::max(evaluation, self.minimax(depth - 1, alpha, beta));
+                // if evaluation > beta {
+                //     self.unmake_move(legal_move);
+                //     break;
+                // }
+
+                // self.unmake_move(legal_move);
+                // alpha = i64::max(alpha, evaluation);
+
+                // Clone approach.
                 let mut game_copy = self.clone();
                 game_copy.make_move(legal_move, true);
                 evaluation = i64::max(evaluation, game_copy.minimax(depth - 1, alpha, beta));
                 if evaluation > beta {
+                    println!("pruned branch, beta");
                     break;
                 }
                 alpha = i64::max(alpha, evaluation);
             }
         } else {
             evaluation = std::i64::MAX;
-            for legal_move in self.legal_moves.iter() {
+            for legal_move in temp_legal_move_clone.iter() {
+
+                // Unmake move approach.
+                // self.make_move(legal_move, true);
+                // evaluation = i64::min(evaluation, self.minimax(depth - 1, alpha, beta));
+                // if evaluation < alpha {
+                //     self.unmake_move(legal_move);
+                //     break;
+                // }
+
+                // self.unmake_move(legal_move);
+                // beta = i64::min(beta, evaluation);
+
+                // Clone approach
                 let mut game_copy = self.clone();
                 game_copy.make_move(legal_move, true);
                 evaluation = i64::min(evaluation, game_copy.minimax(depth - 1, alpha, beta));
                 if evaluation < alpha {
+                    // println!("pruned branch, alpha");
                     break;
                 }
+
                 beta = i64::min(beta, evaluation);
             }
         }
 
         return evaluation;
     }
+
+    pub fn minimax_debug(&mut self, depth: u32, mut alpha: i64, mut beta: i64) -> (i64, Option<Move>) {
+        if self.legal_moves.len() == 0 {
+            if self.white_to_move {
+                if self.is_king_attacked(&Color::White) {
+                    return (std::i64::MIN, None);
+                } else {
+                    return (0, None);
+                }
+            } else {
+                if self.is_king_attacked(&Color::Black) {
+                    return (std::i64::MAX, None);
+                } else {
+                    return (0, None);
+                }
+            }
+        }
+
+        if depth == 0 {
+            return (self.evaluate_board(), None);
+        }
+
+
+
+        let mut temp_evaluation: i64;
+        let mut evaluation: i64;
+        let mut best_move: Option<Move> = None;
+        let indentation_prefix = debug_depth_to_tabs(depth);
+
+        if self.white_to_move {
+            println!("{}Looking at white's moves...", indentation_prefix);
+            evaluation = std::i64::MIN;
+            for legal_move in self.legal_moves.iter() {
+                println!("{}Making move {} for white...", indentation_prefix , legal_move.move_to_str());
+
+                // Clone the board.
+                let mut game_copy = self.clone();
+                game_copy.make_move(legal_move, true);
+
+                // Apply minimax.
+                (temp_evaluation, _) = game_copy.minimax_debug(depth - 1, alpha, beta);
+
+                // If the evaluation is better, store it.
+                if temp_evaluation > evaluation {
+                    let old_best_move_str = match best_move {
+                        None => "None",
+                        Some(m) => &m.move_to_str(),
+                    };
+
+                    println!("{}Updating evaluation. Best move before was {} with evaluation {}", indentation_prefix, old_best_move_str, evaluation);
+                    println!("{}Now is {} with evaluation {}", indentation_prefix, legal_move.move_to_str(), temp_evaluation);
+
+                    evaluation = temp_evaluation;
+                    best_move = Some(*legal_move);
+                }
+
+                if evaluation > beta {
+                    println!("{}Pruned branch, beta", indentation_prefix);
+                    break;
+                }
+
+                // Update alpha.
+                alpha = i64::max(alpha, evaluation);
+            }
+        } else {
+            println!("{}Looking at black's moves...", indentation_prefix);
+            evaluation = std::i64::MAX;
+            for legal_move in self.legal_moves.iter() {
+                println!("{}Making move {} for black...", indentation_prefix, legal_move.move_to_str());
+
+                // Clone the board.
+                let mut game_copy = self.clone();
+                game_copy.make_move(legal_move, true);
+
+                // Apply minimax.
+                (temp_evaluation, _) = game_copy.minimax_debug(depth - 1, alpha, beta);
+
+                // If the evaluation is better, store it.
+                if temp_evaluation < evaluation {
+                    let old_best_move_str = match best_move {
+                        None => "None",
+                        Some(m) => &m.move_to_str(),
+                    };
+
+                    println!("{}Updating evaluation. Best move before was {} with evaluation {}", indentation_prefix, old_best_move_str, evaluation);
+                    println!("{}Now is {} with evaluation {}", indentation_prefix, legal_move.move_to_str(), temp_evaluation);
+
+                    evaluation = temp_evaluation;
+                    best_move = Some(*legal_move);
+                }
+
+                // Alpha-beta pruning
+                if evaluation < alpha {
+                    println!("{}Pruned branch, alpha", indentation_prefix);
+                    break;
+                }
+
+                beta = i64::min(beta, evaluation);
+            }
+        }
+
+        return (evaluation, best_move);
+    }
+}
+
+// Debugging minimax.
+pub fn debug_depth_to_tabs(mut depth: u32) -> String {
+    let mut result = String::new();
+
+    while depth > 0 {
+        result.push('\t');
+        depth -= 1;
+    }
+
+    return result;
 }
 
 pub fn square_to_coord(square: usize) -> String {
