@@ -350,6 +350,9 @@ pub struct ChessGame<'a> {
     pub occupancy_bitboards: [u64; 3],
 
     pub legal_moves: Vec<Move>,
+
+    pub debug_minimax_calls: u64,
+    pub debug_mimimax_moves_made: Vec<Move>,
 }
 
 impl<'a> ChessGame<'a> {
@@ -369,10 +372,15 @@ impl<'a> ChessGame<'a> {
             occupancy_bitboards: [0; 3],
 
             legal_moves: vec![],
+
+            debug_minimax_calls: 0,
+            debug_mimimax_moves_made: vec![],
         };
     }
 
     pub fn debug_verify_board_state(&self, this_move: &Move, prev_game_state: ChessGame, called_by: &str) {
+
+
 
         // Make sure occupancies add up corrrectly.
         if self.occupancy_bitboards[2] != self.occupancy_bitboards[0] | self.occupancy_bitboards[1] {
@@ -408,20 +416,16 @@ impl<'a> ChessGame<'a> {
             prev_game_state.print_board();
             println!("Tried to make/unmake move: {:#?}\n\n Ended up with:", this_move);
 
-            println!("White occupancies before:");
-            print_bitboard(prev_game_state.occupancy_bitboards[0]);
-            println!("White occupancies after:");
-            print_bitboard(self.occupancy_bitboards[0]);
+            println!("White rooks before:");
+            print_bitboard(prev_game_state.piece_bitboards[PieceType::Rook.bitboard_index()]);
+            println!("White rooks after:");
+            print_bitboard(self.piece_bitboards[PieceType::Rook.bitboard_index()]);
 
-            println!("Black occupancies before:");
-            print_bitboard(prev_game_state.occupancy_bitboards[1]);
-            println!("Black occupancies after:");
-            print_bitboard(self.occupancy_bitboards[1]);
-
-            println!("All occupancies before:");
-            print_bitboard(prev_game_state.occupancy_bitboards[2]);
-            println!("All occupancies after:");
-            print_bitboard(self.occupancy_bitboards[2]);
+            println!("Moves that lead to desyc:");
+            for m in self.debug_mimimax_moves_made.iter() {
+                print!("{}, ", m.move_to_str());
+            }
+            println!();
 
             panic!("White pieces desynced by {called_by}.");
         }
@@ -434,21 +438,6 @@ impl<'a> ChessGame<'a> {
             println!("Previous game state");
             prev_game_state.print_board();
             println!("Tried to make/unmake move: {:#?}\n\n Ended up with:", this_move);
-
-            println!("White occupancies before:");
-            print_bitboard(prev_game_state.occupancy_bitboards[0]);
-            println!("White occupancies after:");
-            print_bitboard(self.occupancy_bitboards[0]);
-
-            println!("Black occupancies before:");
-            print_bitboard(prev_game_state.occupancy_bitboards[1]);
-            println!("Black occupancies after:");
-            print_bitboard(self.occupancy_bitboards[1]);
-
-            println!("All occupancies before:");
-            print_bitboard(prev_game_state.occupancy_bitboards[2]);
-            println!("All occupancies after:");
-            print_bitboard(self.occupancy_bitboards[2]);
 
             panic!("Black pieces desynced by {called_by}.");
         }
@@ -1307,12 +1296,12 @@ impl<'a> ChessGame<'a> {
                     }
                     Color::White => {
                         // If white can castle short, but we are capturing the rook on it's starting square; revoke.
-                        if self.can_white_castle_short && this_move.to_square == 56 {
+                        if self.can_white_castle_short && this_move.to_square == 63 {
                             this_move.removes_white_castling_rights_short = Some(true);
                         }
 
                         // If white can castle long, but we are capturing the rook on it's starting square; revoke.
-                        else if self.can_white_castle_long && this_move.to_square == 63 {
+                        else if self.can_white_castle_long && this_move.to_square == 56 {
                             this_move.removes_white_castling_rights_long = Some(true);
                         }
                     }
@@ -2098,50 +2087,10 @@ impl<'a> ChessGame<'a> {
             panic!("Something has gone wrong, called get_bot_move when no legal moves were available...");
         }
 
-        let mut best_eval: i64;
-        let mut best_move: Move = self.legal_moves[0];
-        if self.white_to_move {
-            best_eval = std::i64::MIN;
-        } else {
-            best_eval = std::i64::MAX;
-        }
-
-        // May be an issue?
-        let temp_legal_move_clone = self.legal_moves.clone();
-        for legal_move in temp_legal_move_clone.iter() {
-            // let mut game_copy = self.clone();
-            // game_copy.make_move(legal_move, true);
-            // Make the move, but don't update legal moves?
-            // self.make_move(legal_move, true);
-
-            // // Get the new legal moves in this position.
-            // //let new_position_moves = self.get_legal_moves();
-            // let minimax_eval = self.minimax(4, std::i64::MIN, std::i64::MAX);
-            // if self.white_to_move && minimax_eval > best_eval {
-            //     best_eval = minimax_eval;
-            //     best_move = *legal_move;
-            // } else if !self.white_to_move && minimax_eval < best_eval {
-            //     best_eval = minimax_eval;
-            //     best_move = *legal_move;
-            // }
-
-            // self.unmake_move(legal_move);
+        let (evaluation, best_move) = self.minimax(4, std::i64::MIN, std::i64::MAX);
 
 
-
-            let mut game_copy = self.clone();
-            game_copy.make_move(legal_move, true);
-            let minimax_eval = game_copy.minimax(4, std::i64::MIN, std::i64::MAX);
-            if self.white_to_move && minimax_eval > best_eval {
-                best_eval = minimax_eval;
-                best_move = *legal_move;
-            } else if !self.white_to_move && minimax_eval < best_eval {
-                best_eval = minimax_eval;
-                best_move = *legal_move;
-            }
-        }
-
-        return best_move;
+        return best_move.unwrap();
     }
 
     pub fn get_bot_move_debug(&mut self) -> Move {
@@ -2159,87 +2108,214 @@ impl<'a> ChessGame<'a> {
 
 
 
-    pub fn minimax(&mut self, depth: u32, mut alpha: i64, mut beta: i64) -> i64 {
+    pub fn minimax(&mut self, depth: u32, mut alpha: i64, mut beta: i64) -> (i64, Option<Move>) {
         if self.legal_moves.len() == 0 {
             if self.white_to_move {
                 if self.is_king_attacked(&Color::White) {
-                    return std::i64::MIN;
+                    return (std::i64::MIN, None);
                 } else {
-                    return 0;
+                    return (0, None);
                 }
             } else {
                 if self.is_king_attacked(&Color::Black) {
-                    return std::i64::MAX;
+                    return (std::i64::MAX, None);
                 } else {
-                    return 0;
+                    return (0, None);
                 }
             }
         }
 
         if depth == 0 {
-            return self.evaluate_board();
+            return (self.evaluate_board(), None);
         }
 
         // Clone legal moves? Bad?
         let temp_legal_move_clone = self.legal_moves.clone();
 
-        let mut evaluation: i64;
+        let mut best_evaluation: i64;
+        let mut best_move: Option<Move> = None;
+        let mut temp_evaluation: i64;
+
         if self.white_to_move {
-            evaluation = std::i64::MIN;
+            best_evaluation = std::i64::MIN;
             for legal_move in temp_legal_move_clone.iter() {
-                // Unmake move approach.
-                // self.make_move(legal_move, true);
-                // evaluation = i64::max(evaluation, self.minimax(depth - 1, alpha, beta));
-                // if evaluation > beta {
-                //     self.unmake_move(legal_move);
-                //     break;
-                // }
+                // Make the move.
+                self.make_move(legal_move, true);
 
-                // self.unmake_move(legal_move);
-                // alpha = i64::max(alpha, evaluation);
+                // Get the evaluation of that position.
+                (temp_evaluation, _) = self.minimax(depth - 1, alpha, beta);
 
-                // Clone approach.
-                let mut game_copy = self.clone();
-                game_copy.make_move(legal_move, true);
-                evaluation = i64::max(evaluation, game_copy.minimax(depth - 1, alpha, beta));
-                if evaluation > beta {
-                    println!("pruned branch, beta");
+                // See if it's better.
+                if temp_evaluation > best_evaluation {
+                    best_evaluation = temp_evaluation;
+                    best_move = Some(*legal_move);
+                }
+
+                // Prune.
+                if best_evaluation > beta {
+                    self.unmake_move(legal_move);
                     break;
                 }
-                alpha = i64::max(alpha, evaluation);
+
+                // Undo the move, track alpha.
+                self.unmake_move(legal_move);
+                alpha = i64::max(alpha, best_evaluation);
             }
         } else {
-            evaluation = std::i64::MAX;
+            best_evaluation = std::i64::MAX;
             for legal_move in temp_legal_move_clone.iter() {
 
-                // Unmake move approach.
-                // self.make_move(legal_move, true);
-                // evaluation = i64::min(evaluation, self.minimax(depth - 1, alpha, beta));
-                // if evaluation < alpha {
-                //     self.unmake_move(legal_move);
-                //     break;
-                // }
+                // Make the move.
+                self.make_move(legal_move, true);
 
-                // self.unmake_move(legal_move);
-                // beta = i64::min(beta, evaluation);
+                // Get the evaluation of that position.
+                (temp_evaluation, _) = self.minimax(depth - 1, alpha, beta);
 
-                // Clone approach
-                let mut game_copy = self.clone();
-                game_copy.make_move(legal_move, true);
-                evaluation = i64::min(evaluation, game_copy.minimax(depth - 1, alpha, beta));
-                if evaluation < alpha {
-                    // println!("pruned branch, alpha");
+                // See if it's better.
+                if temp_evaluation < best_evaluation {
+                    best_evaluation = temp_evaluation;
+                    best_move = Some(*legal_move);
+                }
+
+                // Prune.
+                if best_evaluation < alpha {
+                    self.unmake_move(legal_move);
                     break;
                 }
 
-                beta = i64::min(beta, evaluation);
+                // Undo the move, track beta.
+                self.unmake_move(legal_move);
+                beta = i64::min(beta, best_evaluation);
             }
         }
 
-        return evaluation;
+        // Restore legal moves before exiting.
+        self.set_legal_moves(Some(temp_legal_move_clone));
+
+        return (best_evaluation, best_move);
     }
 
+
+    
     pub fn minimax_debug(&mut self, depth: u32, mut alpha: i64, mut beta: i64) -> (i64, Option<Move>) {
+        // Debugging!
+        self.debug_minimax_calls += 1;
+
+        if self.legal_moves.len() == 0 {
+            if self.white_to_move {
+                if self.is_king_attacked(&Color::White) {
+                    return (std::i64::MIN, None);
+                } else {
+                    return (0, None);
+                }
+            } else {
+                if self.is_king_attacked(&Color::Black) {
+                    return (std::i64::MAX, None);
+                } else {
+                    return (0, None);
+                }
+            }
+        }
+
+        if depth == 0 {
+            return (self.evaluate_board(), None);
+        }
+
+        // Clone legal moves? Bad?
+        let temp_legal_move_clone = self.legal_moves.clone();
+
+        let mut best_evaluation: i64;
+        let mut best_move: Option<Move> = None;
+        let mut temp_evaluation: i64;
+
+        if self.white_to_move {
+            best_evaluation = std::i64::MIN;
+            for legal_move in temp_legal_move_clone.iter() {
+                // Make the move.
+                self.make_move(legal_move, true);
+
+                // Debug
+                self.debug_mimimax_moves_made.push(*legal_move);
+
+                // Get the evaluation of that position.
+                (temp_evaluation, _) = self.minimax(depth - 1, alpha, beta);
+
+                // See if it's better.
+                if temp_evaluation > best_evaluation {
+                    best_evaluation = temp_evaluation;
+                    best_move = Some(*legal_move);
+                }
+
+                // Prune.
+                if best_evaluation > beta {
+                    self.unmake_move(legal_move);
+
+                    // Debug
+                    self.debug_mimimax_moves_made.pop();
+
+                    break;
+                }
+
+                
+
+                // Undo the move, track alpha.
+                self.unmake_move(legal_move);
+
+                // Debug
+                self.debug_mimimax_moves_made.pop();
+
+                alpha = i64::max(alpha, best_evaluation);
+            }
+        } else {
+            best_evaluation = std::i64::MAX;
+            for legal_move in temp_legal_move_clone.iter() {
+
+
+                // Make the move.
+                self.make_move(legal_move, true);
+
+                // Debug
+                self.debug_mimimax_moves_made.push(*legal_move);
+
+                // Get the evaluation of that position.
+                (temp_evaluation, _) = self.minimax(depth - 1, alpha, beta);
+
+                // See if it's better.
+                if temp_evaluation < best_evaluation {
+                    best_evaluation = temp_evaluation;
+                    best_move = Some(*legal_move);
+                }
+
+                // Prune.
+                if best_evaluation < alpha {
+                    self.unmake_move(legal_move);
+
+                    // Debug
+                    self.debug_mimimax_moves_made.pop();
+
+                    break;
+                }
+
+                // Undo the move, track beta.
+                self.unmake_move(legal_move);
+
+                // Debug
+                self.debug_mimimax_moves_made.pop();
+
+                beta = i64::min(beta, best_evaluation);
+            }
+        }
+
+        // Restore legal moves before exiting.
+        //self.set_legal_moves(Some(temp_legal_move_clone));
+
+        return (best_evaluation, best_move);
+    }
+
+
+
+
+    pub fn minimax_debug_old(&mut self, depth: u32, mut alpha: i64, mut beta: i64) -> (i64, Option<Move>) {
         if self.legal_moves.len() == 0 {
             if self.white_to_move {
                 if self.is_king_attacked(&Color::White) {

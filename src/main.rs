@@ -23,6 +23,7 @@ async fn main() {
     new_game.set_legal_moves(None);
     //new_game.play_game_vs_bot();
 
+    println!("Initial game state:");
     new_game.print_board();
 
 
@@ -35,6 +36,7 @@ async fn main() {
 
     let elapsed = now.elapsed();
     println!("Bot thinks we should play {}\n Elapsed: {:.2?}", bot_move.move_to_str(), elapsed);
+    //println!("Minimax called {} times", new_game.debug_minimax_calls);
 
     // new_game.set_legal_moves();
     // new_game.print_board();
