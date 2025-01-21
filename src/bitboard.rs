@@ -35,10 +35,6 @@ pub const NOT_FILE_G: u64 = 13816973012072644543;
 pub const NOT_FILE_H: u64 = 9187201950435737471;
 pub const NOT_FILE_GH: u64 = 4557430888798830399;
 
-pub const NOT_RANK_8: u64 = 18446744073709551360;
-pub const NOT_RANK_7: u64 = 18446744073709486335;
-pub const NOT_RANK_2: u64 = 18374967954648334335;
-pub const NOT_RANK_1: u64 = 72057594037927935;
 
 /*
     All Squares: 18446744073709551615
@@ -158,12 +154,6 @@ impl PartialEq for Move {
     }
 }
 
-
-pub enum SliderPieces {
-    Queen,
-    Rook,
-    Bishop,
-}
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum PieceType {
