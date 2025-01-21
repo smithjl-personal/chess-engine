@@ -1028,6 +1028,56 @@ impl<'a> ChessGame<'a> {
 
 
 
+    pub fn sort_moves(&self, moves: &mut Vec<Move>) {
+        moves.sort_unstable_by_key(|m| {
+            let mut move_evaluation: i64 = 0;
+            let is_check = m.is_check == Some(true);
+            let is_capture = m.to_piece_type.is_some();
+            let our_color: Color;
+            let their_color: Color;
+            if self.white_to_move {
+                our_color = Color::White;
+                their_color = Color::Black;
+            } else {
+                our_color = Color::Black;
+                their_color = Color::White;
+            }
+
+            // Smaller move value is better.
+            if is_check {
+                move_evaluation -= 10;
+            }
+
+            // Look at captures.
+            if is_capture {
+                move_evaluation -= 5;
+            }
+
+            /*
+                The below checks actually slow down minimax a bit...
+                but perhaps time will be saved again by looking down the right trees?
+                Just theory crafting for now.
+             */
+
+            // If moving to a square we are attacking, that is good. (destination is defended)
+            if self.is_square_attacked(m.to_square, &our_color) {
+                move_evaluation -= 2;
+            }
+
+            // If moving to a square they are attacking, that is bad. (destination is attacked)
+            if self.is_square_attacked(m.to_square, &their_color) {
+                move_evaluation += 2;
+            }
+
+            // If moving from a square they are attacking, that is good. (escaping an attack)
+            if self.is_square_attacked(m.from_square, &their_color) {
+                move_evaluation -= 2;
+            }
+
+
+            return move_evaluation;
+        });
+    }
 
 
     pub fn is_king_attacked(&self, side_attacked: &Color) -> bool {
@@ -1258,29 +1308,8 @@ impl<'a> ChessGame<'a> {
             self.unmake_move(this_move);
         }
 
-        // Sort the moves.
-        moves.sort_unstable_by_key(|m| {
-            let is_check = m.is_check == Some(true);
-            let is_capture = m.to_piece_type.is_some();
 
-            // Look at checks and captures.
-            if is_check && is_capture {
-                return 1;
-            }
-
-            // Look at checks.
-            if is_check {
-                return 2;
-            }
-
-            // Look at captures.
-            if is_capture {
-                return 3;
-            }
-
-            // Default value of move.
-            return 4;
-        });
+        self.sort_moves(&mut moves);
 
         return moves;
     }
