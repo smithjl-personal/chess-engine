@@ -22,6 +22,8 @@ pub struct Constants {
     // Zobrist hashing!
     // 2 colors, 7 piece types (includes empty), 64 squares.
     pub zobrist_table: [[[u64; 2]; 7]; 64],
+    pub zobrist_castling_rights: [u64; 4],
+    pub zobrist_en_passant: [u64; 8],
 }
 
 impl Constants {
@@ -30,6 +32,8 @@ impl Constants {
         let mut knight_attacks: [u64; 64] = [0; 64];
         let mut king_attacks: [u64; 64] = [0; 64];
         let mut zobrist_table: [[[u64; 2]; 7]; 64] = [[[0; 2]; 7]; 64];
+        let mut zobrist_castling_rights: [u64; 4] = [0; 4];
+        let mut zobrist_en_passant: [u64; 8] = [0; 8];
 
         // These are too big to put on the stack.
         let mut bishop_attacks: Vec<Vec<u64>> = vec![vec![0; 512]; 64];
@@ -70,6 +74,14 @@ impl Constants {
             }
         }
 
+        for castle_side_index in 0..4 {
+            zobrist_castling_rights[castle_side_index] = rng.gen();
+        }
+
+        for en_passant_file in 0..8 {
+            zobrist_en_passant[en_passant_file] = rng.gen();
+        }
+
         return Constants {
             pawn_attacks,
             knight_attacks,
@@ -77,6 +89,8 @@ impl Constants {
             bishop_attacks,
             rook_attacks,
             zobrist_table,
+            zobrist_castling_rights,
+            zobrist_en_passant,
         };
     }
 }
