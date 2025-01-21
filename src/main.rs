@@ -10,13 +10,14 @@ pub mod my_move;
 pub mod piece;
 pub mod piece_type;
 pub mod tests;
+pub mod runtime_calculated_constants;
 
 #[tokio::main]
 async fn main() {
     //let _ = lichess::main().await;
     //let _ = tests::test_performance_of_minimax();
 
-    let c = bitboard::Constants::new();
+    let c = runtime_calculated_constants::Constants::new();
     let mut new_game = bitboard::ChessGame::new(&c);
     //let _ = new_game.import_fen(constants::INITIAL_GAME_STATE_FEN);
     let _ = new_game.import_fen("r2qk2r/5nPP/3Bpp2/1pPR3N/1pP1Q3/1P1b1P1p/P5PP/R3K2R w KQkq b6 0 1");
