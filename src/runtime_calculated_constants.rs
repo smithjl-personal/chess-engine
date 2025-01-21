@@ -1,5 +1,8 @@
 use crate::constants;
-use crate::bitboard;
+use crate::bitboard::Color;
+use crate::bitboard::PieceType;
+use rand::prelude::*;
+use rand_chacha::ChaCha8Rng;
 
 // Consider moving these to true constants file? But they are only used here...
 pub const NOT_FILE_A: u64 = 18374403900871474942;
@@ -15,6 +18,10 @@ pub struct Constants {
     pub king_attacks: [u64; 64],
     pub bishop_attacks: Vec<Vec<u64>>, // [64][512]
     pub rook_attacks: Vec<Vec<u64>>,   // [64][4096]
+
+    // Zobrist hashing!
+    // 2 colors, 7 piece types (includes empty), 64 squares.
+    pub zobrist_table: [[[u64; 2]; 7]; 64],
 }
 
 impl Constants {
@@ -22,16 +29,17 @@ impl Constants {
         let mut pawn_attacks: [[u64; 64]; 2] = [[0; 64]; 2];
         let mut knight_attacks: [u64; 64] = [0; 64];
         let mut king_attacks: [u64; 64] = [0; 64];
+        let mut zobrist_table: [[[u64; 2]; 7]; 64] = [[[0; 2]; 7]; 64];
 
         // These are too big to put on the stack.
         let mut bishop_attacks: Vec<Vec<u64>> = vec![vec![0; 512]; 64];
         let mut rook_attacks: Vec<Vec<u64>> = vec![vec![0; 4096]; 64];
 
         for square in 0..64 {
-            pawn_attacks[bitboard::Color::White.idx()][square] =
-                mask_pawn_attacks(square, bitboard::Color::White);
-            pawn_attacks[bitboard::Color::Black.idx()][square] =
-                mask_pawn_attacks(square, bitboard::Color::Black);
+            pawn_attacks[Color::White.idx()][square] =
+                mask_pawn_attacks(square, Color::White);
+            pawn_attacks[Color::Black.idx()][square] =
+                mask_pawn_attacks(square, Color::Black);
 
             knight_attacks[square] = mask_knight_attacks(square);
             king_attacks[square] = mask_king_attacks(square);
@@ -40,12 +48,35 @@ impl Constants {
         init_slider_attacks(true, &mut bishop_attacks, &mut rook_attacks);
         init_slider_attacks(false, &mut bishop_attacks, &mut rook_attacks);
 
+        let color_indicies: [usize; 2] = [Color::White.idx(), Color::Black.idx()];
+        let piece_type_indicies: [usize; 7] = [
+            PieceType::Pawn.bitboard_index(),
+            PieceType::Bishop.bitboard_index(),
+            PieceType::Knight.bitboard_index(),
+            PieceType::Rook.bitboard_index(),
+            PieceType::Queen.bitboard_index(),
+            PieceType::King.bitboard_index(),
+            6, // Index for empty square.
+        ];
+
+
+        // Initialize zobrist table. We use the same seed every time for debugging purposes.
+        let mut rng = ChaCha8Rng::seed_from_u64(2);
+        for color_index in color_indicies.iter() {
+            for piece_index in piece_type_indicies.iter() {
+                for square in 0..64 {
+                    zobrist_table[square][*piece_index][*color_index] = rng.gen();
+                }
+            }
+        }
+
         return Constants {
             pawn_attacks,
             knight_attacks,
             king_attacks,
             bishop_attacks,
             rook_attacks,
+            zobrist_table,
         };
     }
 }
@@ -417,7 +448,7 @@ pub fn set_occupancies(index: usize, bits_in_mask: usize, mut attack_mask: u64) 
 
 
 
-pub fn mask_pawn_attacks(square: usize, side: bitboard::Color) -> u64 {
+pub fn mask_pawn_attacks(square: usize, side: Color) -> u64 {
     let mut attacks: u64 = 0;
     let mut bitboard: u64 = 0;
 
@@ -425,14 +456,14 @@ pub fn mask_pawn_attacks(square: usize, side: bitboard::Color) -> u64 {
     bitboard = set_bit(bitboard, square);
 
     match side {
-        bitboard::Color::White => {
+        Color::White => {
             // Attacking top right.
             attacks |= (bitboard >> 7) & NOT_FILE_A;
 
             // Attacking top left.
             attacks |= (bitboard >> 9) & NOT_FILE_H;
         }
-        bitboard::Color::Black => {
+        Color::Black => {
             // Attacking bottom right.
             attacks |= (bitboard << 9) & NOT_FILE_A;
 
