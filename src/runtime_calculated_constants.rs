@@ -20,8 +20,8 @@ pub struct Constants {
     pub rook_attacks: Vec<Vec<u64>>,   // [64][4096]
 
     // Zobrist hashing!
-    // 2 colors, 7 piece types (includes empty), 64 squares.
-    pub zobrist_table: [[[u64; 2]; 7]; 64],
+    // 12: one hash for each piece type and color, 64 squares.
+    pub zobrist_table: [[u64; 64]; 12],
 
     // White short, White long, Black short, Black long
     pub zobrist_castling_rights: [u64; 4],
@@ -34,7 +34,7 @@ impl Constants {
         let mut pawn_attacks: [[u64; 64]; 2] = [[0; 64]; 2];
         let mut knight_attacks: [u64; 64] = [0; 64];
         let mut king_attacks: [u64; 64] = [0; 64];
-        let mut zobrist_table: [[[u64; 2]; 7]; 64] = [[[0; 2]; 7]; 64];
+        let mut zobrist_table:  [[u64; 64]; 12] =  [[0; 64]; 12];
         let mut zobrist_castling_rights: [u64; 4] = [0; 4];
         let mut zobrist_en_passant: [u64; 8] = [0; 8];
 
@@ -55,24 +55,23 @@ impl Constants {
         init_slider_attacks(true, &mut bishop_attacks, &mut rook_attacks);
         init_slider_attacks(false, &mut bishop_attacks, &mut rook_attacks);
 
-        let color_indicies: [usize; 2] = [Color::White.idx(), Color::Black.idx()];
-        let piece_type_indicies: [usize; 7] = [
+        let color_offsets: [usize; 2] = [Color::White.piece_bitboard_offset(), Color::Black.piece_bitboard_offset()];
+        let piece_type_indicies: [usize; 6] = [
             PieceType::Pawn.bitboard_index(),
             PieceType::Bishop.bitboard_index(),
             PieceType::Knight.bitboard_index(),
             PieceType::Rook.bitboard_index(),
             PieceType::Queen.bitboard_index(),
             PieceType::King.bitboard_index(),
-            6, // Index for empty square.
         ];
 
 
         // Initialize zobrist table. We use the same seed every time for debugging purposes.
         let mut rng = ChaCha8Rng::seed_from_u64(2);
-        for color_index in color_indicies.iter() {
+        for color_offset in color_offsets.iter() {
             for piece_index in piece_type_indicies.iter() {
                 for square in 0..64 {
-                    zobrist_table[square][*piece_index][*color_index] = rng.gen();
+                    zobrist_table[*color_offset + *piece_index][square] = rng.gen();
                 }
             }
         }

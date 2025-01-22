@@ -26,7 +26,7 @@ async fn main() {
 
     println!("Initial game state:");
     new_game.print_board();
-    println!("Zobrist hash: {}", new_game.zobrist_hash);
+    println!("Zobrist hash before: {}", new_game.zobrist_hash);
 
 
     // Benchmark how long it takes to get a bot move.
@@ -38,6 +38,7 @@ async fn main() {
 
     let elapsed = now.elapsed();
     println!("Bot thinks we should play {}\n Elapsed: {:.2?}", bot_move.move_to_str(), elapsed);
+    println!("Zobrist hash after: {}", new_game.zobrist_hash);
     //println!("Minimax called {} times", new_game.debug_minimax_calls);
 
     // new_game.set_legal_moves();

@@ -479,7 +479,7 @@ impl<'a> ChessGame<'a> {
                 self.place_piece_on_board(piece_color, piece_type, square);
 
                 // Update the zobrist hash.
-                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[square][piece_type.bitboard_index()][piece_color.idx()];
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[piece_type.bitboard_index() + piece_color.piece_bitboard_offset()][square];
 
                 x_pos += 1;
             }
@@ -744,6 +744,7 @@ impl<'a> ChessGame<'a> {
         match source_piece {
             PieceType::Pawn => {
                 self.piece_bitboards[our_piece_bitboard_index] = pop_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.from_square);
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_index][this_move.from_square];
 
                 // Special logic for pawn promotion.
                 match this_move.pawn_promoting_to {
@@ -755,16 +756,24 @@ impl<'a> ChessGame<'a> {
                             PieceType::Knight => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = set_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
                             _ => panic!("Tried to promote to an illegal piece."),
                         }
+                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()][this_move.to_square];
                     },
-                    None => self.piece_bitboards[our_piece_bitboard_index] = set_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.to_square),
+
+                    // Otherwise, it's a normal pawn move.
+                    None => {
+                        self.piece_bitboards[our_piece_bitboard_index] = set_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.to_square);
+                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_index][this_move.to_square];
+                    },
                 }
-                
             },
 
             // Every other piece, remove it from the source, place it at the destination.
             _ => {
                 self.piece_bitboards[our_piece_bitboard_index] = pop_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.from_square);
                 self.piece_bitboards[our_piece_bitboard_index] = set_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.to_square);
+
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_index][this_move.from_square];
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_index][this_move.to_square];
             }
         }
 
@@ -784,8 +793,6 @@ impl<'a> ChessGame<'a> {
             let their_piece_bitboard_index = their_piece.bitboard_index() + their_piece_bitboard_offset;
 
             // Remove their piece from the square; and update their occupancies.
-            // self.piece_bitboards[their_piece_bitboard_index] = pop_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
-            // self.occupancy_bitboards[their_occupancies_index] = pop_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
             match their_piece {
                 // For pawn captures, handle en-passant.
                 PieceType::Pawn => {
@@ -800,6 +807,7 @@ impl<'a> ChessGame<'a> {
 
                         // Remove their pawn we captured en-passant.
                         self.piece_bitboards[their_piece_bitboard_offset + their_piece.bitboard_index()] = pop_bit(self.piece_bitboards[their_piece_bitboard_offset + their_piece.bitboard_index()], en_passant_target_pawn_index);
+                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table[their_piece_bitboard_offset + their_piece.bitboard_index()][en_passant_target_pawn_index];
 
                         // Remove their occupancy.
                         self.occupancy_bitboards[their_occupancies_index] = pop_bit(self.occupancy_bitboards[their_occupancies_index], en_passant_target_pawn_index);
@@ -809,6 +817,7 @@ impl<'a> ChessGame<'a> {
                     } else {
                         // Remove that piece from the board.
                         self.piece_bitboards[their_piece_bitboard_index] = pop_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
+                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table[their_piece_bitboard_index][this_move.to_square];
 
                         // Update their occupancies.
                         self.occupancy_bitboards[their_occupancies_index] = pop_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
@@ -820,6 +829,7 @@ impl<'a> ChessGame<'a> {
 
                     // Remove that piece from the board.
                     self.piece_bitboards[their_piece_bitboard_index] = pop_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
+                    self.zobrist_hash ^= self.bitboard_constants.zobrist_table[their_piece_bitboard_index][this_move.to_square];
 
                     // Update their occupancies.
                     self.occupancy_bitboards[their_occupancies_index] = pop_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
@@ -846,6 +856,9 @@ impl<'a> ChessGame<'a> {
                 self.piece_bitboards[rook_bitboard_index] = pop_bit(self.piece_bitboards[rook_bitboard_index], rook_from_position);
                 self.piece_bitboards[rook_bitboard_index] = set_bit(self.piece_bitboards[rook_bitboard_index], rook_to_position);
 
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[rook_bitboard_index][rook_from_position];
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[rook_bitboard_index][rook_to_position];
+
                 // Update our occupancies.
                 self.occupancy_bitboards[our_occupancies_index] = pop_bit(self.occupancy_bitboards[our_occupancies_index], rook_from_position);
                 self.occupancy_bitboards[our_occupancies_index] = set_bit(self.occupancy_bitboards[our_occupancies_index], rook_to_position);
@@ -859,22 +872,41 @@ impl<'a> ChessGame<'a> {
         // Forfeiting castling rights.
         if this_move.removes_white_castling_rights_short == Some(true) {
             self.can_white_castle_short = false;
+            self.zobrist_hash ^= self.bitboard_constants.zobrist_castling_rights[0];
         }
         if this_move.removes_white_castling_rights_long == Some(true) {
             self.can_white_castle_long = false;
+            self.zobrist_hash ^= self.bitboard_constants.zobrist_castling_rights[1];
         }
         if this_move.removes_black_castling_rights_short == Some(true) {
             self.can_black_castle_short = false;
+            self.zobrist_hash ^= self.bitboard_constants.zobrist_castling_rights[2];
         }
         if this_move.removes_black_castling_rights_long == Some(true) {
             self.can_black_castle_long = false;
+            self.zobrist_hash ^= self.bitboard_constants.zobrist_castling_rights[3];
         }
 
         // Only needed if we are capturing.
         self.en_passant_target = this_move.next_en_passant_target_coord;
 
+        // Update zobrist hash based on en-passant file.
+        match this_move.next_en_passant_target_coord {
+            Some(square) => {
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_en_passant[square % 8];
+            },
+            None => (),
+        }
+        match this_move.last_en_passant_target_coord {
+            Some(square) => {
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_en_passant[square % 8];
+            },
+            None => (),
+        }
+
         // Important for checking if move is illegal.
         self.white_to_move = !self.white_to_move;
+        self.zobrist_hash ^= self.bitboard_constants.zobrist_to_move;
 
 
 
@@ -918,6 +950,7 @@ impl<'a> ChessGame<'a> {
         match source_piece {
             PieceType::Pawn => {
                 self.piece_bitboards[our_piece_bitboard_index] = set_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.from_square);
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_index][this_move.from_square];
 
                 // Special logic for pawn DEMOTION.
                 match this_move.pawn_promoting_to {
@@ -929,8 +962,12 @@ impl<'a> ChessGame<'a> {
                             PieceType::Knight => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = pop_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
                             _ => panic!("Tried to promote to an illegal piece."),
                         }
+                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()][this_move.to_square];
                     },
-                    None => self.piece_bitboards[our_piece_bitboard_index] = pop_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.to_square),
+                    None => {
+                        self.piece_bitboards[our_piece_bitboard_index] = pop_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.to_square);
+                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_index][this_move.to_square];
+                    },
                 }
                 
             },
@@ -939,6 +976,8 @@ impl<'a> ChessGame<'a> {
             _ => {
                 self.piece_bitboards[our_piece_bitboard_index] = pop_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.to_square);
                 self.piece_bitboards[our_piece_bitboard_index] = set_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.from_square);
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_index][this_move.to_square];
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_index][this_move.from_square];
             }
         }
 
@@ -958,8 +997,6 @@ impl<'a> ChessGame<'a> {
             let their_piece_bitboard_index = their_piece.bitboard_index() + their_piece_bitboard_offset;
 
             // Place their piece on the square; and update their occupancies.
-            // self.piece_bitboards[their_piece_bitboard_index] = set_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
-            // self.occupancy_bitboards[their_occupancies_index] = set_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
             match their_piece {
                 // For pawn captures, handle en-passant.
                 PieceType::Pawn => {
@@ -974,6 +1011,7 @@ impl<'a> ChessGame<'a> {
 
                         // Add their pawn we captured en-passant.
                         self.piece_bitboards[their_piece_bitboard_offset + their_piece.bitboard_index()] = set_bit(self.piece_bitboards[their_piece_bitboard_offset + their_piece.bitboard_index()], en_passant_target_pawn_index);
+                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table[their_piece_bitboard_offset + their_piece.bitboard_index()][en_passant_target_pawn_index];
 
                         // Add their occupancy.
                         self.occupancy_bitboards[their_occupancies_index] = set_bit(self.occupancy_bitboards[their_occupancies_index], en_passant_target_pawn_index);
@@ -983,6 +1021,7 @@ impl<'a> ChessGame<'a> {
                     } else {
                         // Add that piece from the board.
                         self.piece_bitboards[their_piece_bitboard_index] = set_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
+                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table[their_piece_bitboard_index][this_move.to_square];
 
                         // Update their occupancies.
                         self.occupancy_bitboards[their_occupancies_index] = set_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
@@ -994,6 +1033,7 @@ impl<'a> ChessGame<'a> {
 
                     // Add that piece from the board.
                     self.piece_bitboards[their_piece_bitboard_index] = set_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
+                    self.zobrist_hash ^= self.bitboard_constants.zobrist_table[their_piece_bitboard_index][this_move.to_square];
 
                     // Update their occupancies.
                     self.occupancy_bitboards[their_occupancies_index] = set_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
@@ -1020,6 +1060,9 @@ impl<'a> ChessGame<'a> {
                 self.piece_bitboards[rook_bitboard_index] = set_bit(self.piece_bitboards[rook_bitboard_index], rook_from_position);
                 self.piece_bitboards[rook_bitboard_index] = pop_bit(self.piece_bitboards[rook_bitboard_index], rook_to_position);
 
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[rook_bitboard_index][rook_from_position];
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[rook_bitboard_index][rook_to_position];
+
                 // Update our occupancies.
                 self.occupancy_bitboards[our_occupancies_index] = set_bit(self.occupancy_bitboards[our_occupancies_index], rook_from_position);
                 self.occupancy_bitboards[our_occupancies_index] = pop_bit(self.occupancy_bitboards[our_occupancies_index], rook_to_position);
@@ -1033,22 +1076,41 @@ impl<'a> ChessGame<'a> {
         // Grant castling rights back if we forfeited them.
         if this_move.removes_white_castling_rights_short == Some(true) {
             self.can_white_castle_short = true;
+            self.zobrist_hash ^= self.bitboard_constants.zobrist_castling_rights[0];
         }
         if this_move.removes_white_castling_rights_long == Some(true) {
             self.can_white_castle_long = true;
+            self.zobrist_hash ^= self.bitboard_constants.zobrist_castling_rights[1];
         }
         if this_move.removes_black_castling_rights_short == Some(true) {
             self.can_black_castle_short = true;
+            self.zobrist_hash ^= self.bitboard_constants.zobrist_castling_rights[2];
         }
         if this_move.removes_black_castling_rights_long == Some(true) {
             self.can_black_castle_long = true;
+            self.zobrist_hash ^= self.bitboard_constants.zobrist_castling_rights[3];
         }
 
         // Only needed if we are capturing.
         self.en_passant_target = this_move.last_en_passant_target_coord;
 
+        // Update zobrist hash based on en-passant file.
+        match this_move.next_en_passant_target_coord {
+            Some(square) => {
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_en_passant[square % 8];
+            },
+            None => (),
+        }
+        match this_move.last_en_passant_target_coord {
+            Some(square) => {
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_en_passant[square % 8];
+            },
+            None => (),
+        }
+
         // Important for checking if move is illegal.
         self.white_to_move = !self.white_to_move;
+        self.zobrist_hash ^= self.bitboard_constants.zobrist_to_move;
 
         // Debugging!
         //self.debug_verify_board_state(this_move, debug_initial_game_state, "Unmake move");
