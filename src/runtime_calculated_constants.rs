@@ -22,8 +22,11 @@ pub struct Constants {
     // Zobrist hashing!
     // 2 colors, 7 piece types (includes empty), 64 squares.
     pub zobrist_table: [[[u64; 2]; 7]; 64],
+
+    // White short, White long, Black short, Black long
     pub zobrist_castling_rights: [u64; 4],
     pub zobrist_en_passant: [u64; 8],
+    pub zobrist_to_move: u64,
 }
 
 impl Constants {
@@ -91,6 +94,7 @@ impl Constants {
             zobrist_table,
             zobrist_castling_rights,
             zobrist_en_passant,
+            zobrist_to_move: rng.gen(),
         };
     }
 }

@@ -26,6 +26,7 @@ async fn main() {
 
     println!("Initial game state:");
     new_game.print_board();
+    println!("Zobrist hash: {}", new_game.zobrist_hash);
 
 
     // Benchmark how long it takes to get a bot move.

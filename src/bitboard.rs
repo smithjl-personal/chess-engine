@@ -257,6 +257,8 @@ impl PieceType {
 pub struct ChessGame<'a> {
     pub bitboard_constants: &'a Constants,
 
+    pub zobrist_hash: u64,
+
     // En-Passant
     pub en_passant_target: Option<usize>,
 
@@ -296,6 +298,8 @@ impl<'a> ChessGame<'a> {
     pub fn new(c: &'a Constants) -> Self {
         return ChessGame {
             bitboard_constants: c,
+
+            zobrist_hash: 0,
 
             en_passant_target: None,
 
@@ -416,6 +420,9 @@ impl<'a> ChessGame<'a> {
         // Clear the board.
         self.clear_board();
 
+        // Reset the zobrist hash.
+        self.zobrist_hash = 0;
+
         // Trim the string.
         let trimmed_full_fen = fen.trim();
 
@@ -471,6 +478,9 @@ impl<'a> ChessGame<'a> {
                 let square: usize = y_pos * 8 + x_pos;
                 self.place_piece_on_board(piece_color, piece_type, square);
 
+                // Update the zobrist hash.
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[square][piece_type.bitboard_index()][piece_color.idx()];
+
                 x_pos += 1;
             }
 
@@ -501,8 +511,12 @@ impl<'a> ChessGame<'a> {
 
         if whose_turn.to_ascii_lowercase() == "w" {
             self.white_to_move = true;
+            // Zobrist hash assumes white to move initially.
         } else if whose_turn.to_ascii_lowercase() == "b" {
             self.white_to_move = false;
+
+            // XOR if it's black to move.
+            self.zobrist_hash ^= self.bitboard_constants.zobrist_to_move;
         } else {
             return Err(format!(
                 "Unexpected character for whose turn it is: {}. Should be 'w' or 'b'.",
@@ -523,10 +537,22 @@ impl<'a> ChessGame<'a> {
                 // Update rights based on what we find in the string.
                 for c in s.chars() {
                     match c {
-                        'K' => self.can_white_castle_short = true,
-                        'Q' => self.can_white_castle_long = true,
-                        'k' => self.can_black_castle_short = true,
-                        'q' => self.can_black_castle_long = true,
+                        'K' => {
+                            self.can_white_castle_short = true;
+                            self.zobrist_hash ^= self.bitboard_constants.zobrist_castling_rights[0];
+                        },
+                        'Q' => {
+                            self.can_white_castle_long = true;
+                            self.zobrist_hash ^= self.bitboard_constants.zobrist_castling_rights[1];
+                        },
+                        'k' => {
+                            self.can_black_castle_short = true;
+                            self.zobrist_hash ^= self.bitboard_constants.zobrist_castling_rights[2];
+                        },
+                        'q' => {
+                            self.can_black_castle_long = true;
+                            self.zobrist_hash ^= self.bitboard_constants.zobrist_castling_rights[3];
+                        },
                         _ => (),
                     }
                 }
@@ -541,7 +567,9 @@ impl<'a> ChessGame<'a> {
                 // Try to parse the string as a coordinate.
                 let parsed_coord = str_coord_to_square(s);
                 if parsed_coord.is_ok() {
-                    self.en_passant_target = Some(parsed_coord.unwrap());
+                    let square = parsed_coord.unwrap();
+                    self.en_passant_target = Some(square);
+                    self.zobrist_hash ^= self.bitboard_constants.zobrist_en_passant[square % 8];
                 } else {
                     self.en_passant_target = None;
                 }
