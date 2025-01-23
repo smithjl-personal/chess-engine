@@ -14,32 +14,32 @@ pub mod runtime_calculated_constants;
 
 #[tokio::main]
 async fn main() {
-    //let _ = lichess::main().await;
+    let _ = lichess::main().await;
     //let _ = tests::test_performance_of_minimax();
 
-    let c = runtime_calculated_constants::Constants::new();
-    let mut new_game = bitboard::ChessGame::new(&c);
-    //let _ = new_game.import_fen(constants::INITIAL_GAME_STATE_FEN);
-    let _ = new_game.import_fen("r2qk2r/5nPP/3Bpp2/1pPR3N/1pP1Q3/1P1b1P1p/P5PP/R3K2R w KQkq b6 0 1");
-    new_game.set_legal_moves(None);
-    //new_game.play_game_vs_bot();
+    // let c = runtime_calculated_constants::Constants::new();
+    // let mut new_game = bitboard::ChessGame::new(&c);
+    // //let _ = new_game.import_fen(constants::INITIAL_GAME_STATE_FEN);
+    // let _ = new_game.import_fen("r2qk2r/5nPP/3Bpp2/1pPR3N/1pP1Q3/1P1b1P1p/P5PP/R3K2R w KQkq b6 0 1");
+    // new_game.set_legal_moves(None);
+    // //new_game.play_game_vs_bot();
 
-    println!("Initial game state:");
-    new_game.print_board();
-    println!("Zobrist hash before: {}", new_game.zobrist_hash);
-
-
-    // Benchmark how long it takes to get a bot move.
-    use std::time::Instant;
-    let now = Instant::now();
+    // println!("Initial game state:");
+    // new_game.print_board();
+    // println!("Zobrist hash before: {}", new_game.zobrist_hash);
 
 
-    let bot_move = new_game.get_bot_move();
+    // // Benchmark how long it takes to get a bot move.
+    // use std::time::Instant;
+    // let now = Instant::now();
 
-    let elapsed = now.elapsed();
-    println!("Bot thinks we should play {}\n Elapsed: {:.2?}", bot_move.move_to_str(), elapsed);
-    println!("Zobrist hash after: {}", new_game.zobrist_hash);
-    println!("Size of transposition table: {}", new_game.transposition_table.len());
+
+    // let bot_move = new_game.get_bot_move();
+
+    // let elapsed = now.elapsed();
+    // println!("Bot thinks we should play {}\n Elapsed: {:.2?}", bot_move.move_to_str(), elapsed);
+    // println!("Zobrist hash after: {}", new_game.zobrist_hash);
+    // println!("Size of transposition table: {}", new_game.transposition_table.len());
     //println!("Minimax called {} times", new_game.debug_minimax_calls);
 
     // new_game.set_legal_moves();

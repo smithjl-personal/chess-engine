@@ -1,4 +1,4 @@
-use crate::{constants, g, lichess_structs, my_move};
+use crate::{constants, lichess_structs, bitboard, runtime_calculated_constants};
 use core::str;
 use std::collections::HashMap;
 use std::env;
@@ -37,7 +37,8 @@ async fn play_game(token: &str, game_id: &str, fen: &str) {
 
     // This function will run forever, when calling a streamed API.
     let mut lichess_game: lichess_structs::GameFull = lichess_structs::GameFull::default();
-    let mut game = g::Game::default();
+    let runtime_constant = runtime_calculated_constants::Constants::new();
+    let mut game = bitboard::ChessGame::new(&runtime_constant);
     let mut is_bot_white: bool = true;
     while let Some(chunk) = response.chunk().await.unwrap() {
         // We just received the '\n' from the API to keep the connection alive. Ignore processing.
@@ -74,7 +75,7 @@ async fn play_game(token: &str, game_id: &str, fen: &str) {
 
             // If player types debug in the chat, print some info to the screen.
             if chat_event.text == "debug" {
-                println!("{}", game.get_debug_game_state_str());
+                //println!("{}", game.get_debug_game_state_str());
                 let _ = write_chat_message(
                     token,
                     &lichess_game.id,
@@ -84,6 +85,7 @@ async fn play_game(token: &str, game_id: &str, fen: &str) {
             }
             continue;
         } else if full_str.contains("\"type\":\"gameFull\"") {
+            println!("Handling game state full...");
             let lichess_game_parse_attempt: Result<lichess_structs::GameFull, serde_json::Error> =
                 serde_json::from_str(full_str);
             lichess_game = match lichess_game_parse_attempt {
@@ -103,8 +105,11 @@ async fn play_game(token: &str, game_id: &str, fen: &str) {
             is_bot_white = lichess_game.white.id == constants::LICHESS_BOT_USERNAME;
 
             // Import the FEN, let the rest below handle the rest. Game state is now set.
-            game.import_fen(fen);
+            _ = game.import_fen(fen);
+            game.set_legal_moves(None);
         } else if full_str.contains("\"type\":\"gameState\"") {
+            println!("Handling game state...");
+
             let lichess_game_state_parse_attempt: Result<
                 lichess_structs::GameState,
                 serde_json::Error,
@@ -132,8 +137,14 @@ async fn play_game(token: &str, game_id: &str, fen: &str) {
             // TODO: Check for resignation?
 
             // Handle errors later...
-            let last_move = my_move::Move::str_to_move(&last_move_str);
-            game.make_move_and_update_state(&last_move.unwrap());
+            let last_move = bitboard::Move::str_to_move(&last_move_str).expect("API returned a move we could not convert.");
+            let cloned_legal_moves = game.legal_moves.clone();
+            for m in cloned_legal_moves.iter() {
+                if *m == last_move {
+                    game.make_move(m, true);
+                    break;
+                }
+            }
 
             // Print our evaluation after each move.
             println!("Our evaluation of the position: {}", game.evaluate_board());
@@ -155,10 +166,10 @@ async fn play_game(token: &str, game_id: &str, fen: &str) {
 
         // We know it is our turn. Run minimax to find a good move.
         let bot_move = game.get_bot_move();
-        println!("Bot thinks we should play: {}", bot_move);
+        println!("Bot thinks we should play: {}", bot_move.move_to_str());
 
         // Try to make the move.
-        let move_result = make_move(token, &lichess_game.id, &bot_move.to_string()).await;
+        let move_result = make_move(token, &lichess_game.id, &bot_move.move_to_str()).await;
 
         // Handle errors in the console.
         let _ = match move_result {

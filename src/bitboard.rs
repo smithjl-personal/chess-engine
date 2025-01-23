@@ -738,7 +738,7 @@ impl<'a> ChessGame<'a> {
 
 
     pub fn make_move(&mut self, this_move: &Move, update_legal_moves: bool) {
-        let debug_initial_game_state = self.clone();
+        //let debug_initial_game_state = self.clone();
 
         let source_piece = this_move.from_piece_type.expect("This should always be here.");
 
@@ -944,7 +944,7 @@ impl<'a> ChessGame<'a> {
 
 
     pub fn unmake_move(&mut self, this_move: &Move) {
-        let debug_initial_game_state = self.clone();
+        //let debug_initial_game_state = self.clone();
 
         let source_piece = this_move.from_piece_type.expect("This should always be here.");
 
@@ -2191,7 +2191,7 @@ impl<'a> ChessGame<'a> {
         if self.transposition_table.contains_key(&self.zobrist_hash) {
             let entry = self.transposition_table.get(&self.zobrist_hash).expect("Guard clause filters this.");
             if entry.depth >= depth {
-                println!("{}Cache hit at good depth!", debug_depth_to_tabs(depth));
+                //println!("{}Cache hit at good depth!", debug_depth_to_tabs(depth));
                 match entry.node_type {
                     TranspositionTableNodeType::Exact => {
                         return (entry.evaluation, entry.best_move);
@@ -2234,7 +2234,7 @@ impl<'a> ChessGame<'a> {
         let temp_legal_move_clone = self.legal_moves.clone();
 
         let mut best_evaluation: i64;
-        let mut best_move: Option<Move> = None;
+        let mut best_move: Option<Move> = Some(temp_legal_move_clone[0]); // Assume first move is best. Important if all moves lead to mate.
         let mut temp_evaluation: i64;
 
         if self.white_to_move {
@@ -2305,16 +2305,16 @@ impl<'a> ChessGame<'a> {
         }
 
         // Update transposition table.
-        let time = std::time::SystemTime::now();
-        self.transposition_table.insert(self.zobrist_hash, TranspositionTableEntry {
-            zobrist_hash: self.zobrist_hash,
-            best_move: best_move,
-            depth: depth,
-            node_type: node,
-            evaluation: best_evaluation,
-            age: time.duration_since(std::time::UNIX_EPOCH).expect("Time went back?").as_millis(),
-        });
-        println!("{}Set data in transposition table. Minimax call: {}", debug_depth_to_tabs(depth), self.debug_minimax_calls);
+        // let time = std::time::SystemTime::now();
+        // self.transposition_table.insert(self.zobrist_hash, TranspositionTableEntry {
+        //     zobrist_hash: self.zobrist_hash,
+        //     best_move: best_move,
+        //     depth: depth,
+        //     node_type: node,
+        //     evaluation: best_evaluation,
+        //     age: time.duration_since(std::time::UNIX_EPOCH).expect("Time went back?").as_millis(),
+        // });
+        //println!("{}Set data in transposition table. Minimax call: {}", debug_depth_to_tabs(depth), self.debug_minimax_calls);
 
         return (best_evaluation, best_move);
     }
