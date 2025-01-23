@@ -1,6 +1,24 @@
 use crate::constants;
 use crate::runtime_calculated_constants::Constants;
 use std::io;
+use std::collections::HashMap;
+
+#[derive(Clone)]
+    pub struct TranspositionTableEntry {
+        zobrist_hash: u64,
+        best_move: Option<Move>,
+        depth: u32,
+        evaluation: i64,
+        node_type: TranspositionTableNodeType,
+        age: u128,
+    }
+
+    #[derive(Clone)]
+    pub enum TranspositionTableNodeType {
+        Exact,
+        LowerBound,
+        UpperBound,
+    }
 
 #[derive(Copy, Clone, Debug)]
 pub enum Color {
@@ -259,6 +277,8 @@ pub struct ChessGame<'a> {
 
     pub zobrist_hash: u64,
 
+    pub transposition_table: HashMap<u64, TranspositionTableEntry>,
+
     // En-Passant
     pub en_passant_target: Option<usize>,
 
@@ -300,6 +320,7 @@ impl<'a> ChessGame<'a> {
             bitboard_constants: c,
 
             zobrist_hash: 0,
+            transposition_table: HashMap::new(),
 
             en_passant_target: None,
 
@@ -2165,6 +2186,30 @@ impl<'a> ChessGame<'a> {
 
 
     pub fn minimax(&mut self, depth: u32, mut alpha: i64, mut beta: i64) -> (i64, Option<Move>) {
+        self.debug_minimax_calls += 1;
+
+        if self.transposition_table.contains_key(&self.zobrist_hash) {
+            let entry = self.transposition_table.get(&self.zobrist_hash).expect("Guard clause filters this.");
+            if entry.depth >= depth {
+                println!("{}Cache hit at good depth!", debug_depth_to_tabs(depth));
+                match entry.node_type {
+                    TranspositionTableNodeType::Exact => {
+                        return (entry.evaluation, entry.best_move);
+                    }
+                    TranspositionTableNodeType::LowerBound => {
+                        if entry.evaluation > alpha {
+                            return (entry.evaluation, entry.best_move);
+                        }
+                    }
+                    TranspositionTableNodeType::UpperBound => {
+                        if entry.evaluation < beta {
+                            return (entry.evaluation, entry.best_move);
+                        }
+                    }
+                }
+            }
+        }
+
         if self.legal_moves.len() == 0 {
             if self.white_to_move {
                 if self.is_king_attacked(&Color::White) {
@@ -2247,6 +2292,29 @@ impl<'a> ChessGame<'a> {
 
         // Restore legal moves before exiting.
         self.set_legal_moves(Some(temp_legal_move_clone));
+
+
+        // Find out transposition table node type.
+        let node: TranspositionTableNodeType;
+        if best_evaluation <= alpha {
+            node = TranspositionTableNodeType::UpperBound;
+        } else if best_evaluation >= beta {
+            node = TranspositionTableNodeType::LowerBound;
+        } else {
+            node = TranspositionTableNodeType::Exact;
+        }
+
+        // Update transposition table.
+        let time = std::time::SystemTime::now();
+        self.transposition_table.insert(self.zobrist_hash, TranspositionTableEntry {
+            zobrist_hash: self.zobrist_hash,
+            best_move: best_move,
+            depth: depth,
+            node_type: node,
+            evaluation: best_evaluation,
+            age: time.duration_since(std::time::UNIX_EPOCH).expect("Time went back?").as_millis(),
+        });
+        println!("{}Set data in transposition table. Minimax call: {}", debug_depth_to_tabs(depth), self.debug_minimax_calls);
 
         return (best_evaluation, best_move);
     }
