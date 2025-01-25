@@ -198,9 +198,13 @@ pub fn mask_bishop_attacks(square: u64) -> u64 {
     return attacks;
 }
 
+
 // Function a bit different than the others, it doesn't actually generate all the attacks...
 pub fn dynamic_bishop_attacks(square: u64, block: u64) -> u64 {
     let mut attacks: u64 = 0;
+
+    let mut file_underflow: bool;
+    let mut rank_underflow: bool;
 
     let target_rank: u64 = square / 8;
     let target_file: u64 = square % 8;
@@ -226,11 +230,17 @@ pub fn dynamic_bishop_attacks(square: u64, block: u64) -> u64 {
 
     // Bottom Left Diagonal. Rust does not like subtraction overflow :D
     rank = target_rank + 1;
-    file = match target_file.checked_sub(1) {
-        Some(f) => f,
-        None => 0,
+    match target_file.checked_sub(1) {
+        Some(f) => {
+            file = f;
+            file_underflow = false;
+        },
+        None => {
+            file = 0;
+            file_underflow = true;
+        },
     };
-    while rank <= 7 {
+    while rank <= 7 && !file_underflow {
         let focus_square: u64 = 1 << (rank * 8 + file);
         attacks |= focus_square;
 
@@ -248,12 +258,18 @@ pub fn dynamic_bishop_attacks(square: u64, block: u64) -> u64 {
     }
 
     // Top Right Diagonal.
-    rank = match target_rank.checked_sub(1) {
-        Some(r) => r,
-        None => 0,
+    match target_rank.checked_sub(1) {
+        Some(r) => {
+            rank = r;
+            rank_underflow = false;
+        },
+        None => {
+            rank = 0;
+            rank_underflow = true;
+        },
     };
     file = target_file + 1;
-    while file <= 7 {
+    while file <= 7 && !rank_underflow {
         let focus_square: u64 = 1 << (rank * 8 + file);
         attacks |= focus_square;
 
@@ -270,15 +286,27 @@ pub fn dynamic_bishop_attacks(square: u64, block: u64) -> u64 {
     }
 
     // Top Left Diagonal.
-    rank = match target_rank.checked_sub(1) {
-        Some(r) => r,
-        None => 0,
+    match target_rank.checked_sub(1) {
+        Some(r) => {
+            rank = r;
+            rank_underflow = false;
+        },
+        None => {
+            rank = 0;
+            rank_underflow = true;
+        },
     };
-    file = match target_file.checked_sub(1) {
-        Some(f) => f,
-        None => 0,
+    match target_file.checked_sub(1) {
+        Some(f) => {
+            file = f;
+            file_underflow = false;
+        },
+        None => {
+            file = 0;
+            file_underflow = true;
+        },
     };
-    loop {
+    while !rank_underflow && !file_underflow {
         let focus_square: u64 = 1 << (rank * 8 + file);
         attacks |= focus_square;
 
@@ -299,6 +327,7 @@ pub fn dynamic_bishop_attacks(square: u64, block: u64) -> u64 {
 
     return attacks;
 }
+
 
 // Function a bit different than the others, it doesn't actually generate all the attacks...
 pub fn mask_rook_attacks(square: u64) -> u64 {
