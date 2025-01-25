@@ -1903,7 +1903,8 @@ impl<'a> ChessGame<'a> {
             panic!("Something has gone wrong, called get_bot_move when no legal moves were available...");
         }
 
-        let (evaluation, best_move) = self.minimax(4, std::i64::MIN, std::i64::MAX);
+        //let (evaluation, best_move) = self.minimax(4, std::i64::MIN, std::i64::MAX);
+        let (evaluation, best_move) = self.iterative_deepening_minimax();
 
 
         return best_move.unwrap();
@@ -1914,12 +1915,45 @@ impl<'a> ChessGame<'a> {
             panic!("Something has gone wrong, called get_bot_move when no legal moves were available...");
         }
 
-        let (evaluation, best_move) = self.minimax_debug(4, std::i64::MIN, std::i64::MAX);
+        let (evaluation, best_move) = self.iterative_deepening_minimax();
 
         println!("Best move evaluation {evaluation}");
 
 
         return best_move.unwrap();
+    }
+
+    pub fn iterative_deepening_minimax(&mut self) -> (i64, Option<Move>) {
+        let start_time = std::time::SystemTime::now();
+        let mut best_evaluation: i64 = 0;
+        let mut best_move: Option<Move> = None;
+        let mut search_depth = 1;
+
+        // Iteratively deepen...
+        loop {
+
+            //println!("Currently searching depth {search_depth}");
+
+
+            // Search at the current depth.
+            (best_evaluation, best_move) = self.minimax(search_depth, std::i64::MIN, std::i64::MAX);
+
+            // See how long that last operation took. If it was too long, stop the search.
+            let time_spent_ms = std::time::SystemTime::now().duration_since(start_time).expect("Time went back?").as_millis();
+            if time_spent_ms >= 5_000 {
+                break;
+            }
+
+            //println!("Currently spent {time_spent_ms}ms");
+
+            // Otherwise, increase our depth and continue!
+            search_depth += 1;
+        }
+
+        //println!("This search reached depth {search_depth}");
+
+        // Return the best moves we found.
+        return (best_evaluation, best_move);
     }
 
 
