@@ -2188,9 +2188,11 @@ impl<'a> ChessGame<'a> {
     pub fn minimax(&mut self, depth: u32, mut alpha: i64, mut beta: i64) -> (i64, Option<Move>) {
         self.debug_minimax_calls += 1;
 
-        if self.transposition_table.contains_key(&self.zobrist_hash) {
-            let entry = self.transposition_table.get(&self.zobrist_hash).expect("Guard clause filters this.");
-            if entry.depth >= depth {
+        let zobrist_hash_index = self.zobrist_hash % 10_000;
+
+        if self.transposition_table.contains_key(&zobrist_hash_index) {
+            let entry = self.transposition_table.get(&zobrist_hash_index).expect("Guard clause filters this.");
+            if entry.depth >= depth && self.zobrist_hash == entry.zobrist_hash {
                 //println!("{}Cache hit at good depth!", debug_depth_to_tabs(depth));
                 match entry.node_type {
                     TranspositionTableNodeType::Exact => {
@@ -2305,15 +2307,15 @@ impl<'a> ChessGame<'a> {
         }
 
         // Update transposition table.
-        // let time = std::time::SystemTime::now();
-        // self.transposition_table.insert(self.zobrist_hash, TranspositionTableEntry {
-        //     zobrist_hash: self.zobrist_hash,
-        //     best_move: best_move,
-        //     depth: depth,
-        //     node_type: node,
-        //     evaluation: best_evaluation,
-        //     age: time.duration_since(std::time::UNIX_EPOCH).expect("Time went back?").as_millis(),
-        // });
+        let time = std::time::SystemTime::now();
+        self.transposition_table.insert(zobrist_hash_index, TranspositionTableEntry {
+            zobrist_hash: self.zobrist_hash,
+            best_move: best_move,
+            depth: depth,
+            node_type: node,
+            evaluation: best_evaluation,
+            age: time.duration_since(std::time::UNIX_EPOCH).expect("Time went back?").as_millis(),
+        });
         //println!("{}Set data in transposition table. Minimax call: {}", debug_depth_to_tabs(depth), self.debug_minimax_calls);
 
         return (best_evaluation, best_move);
