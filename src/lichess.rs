@@ -2,6 +2,7 @@ use crate::{constants, lichess_structs, bitboard, runtime_calculated_constants};
 use core::str;
 use std::collections::HashMap;
 use std::env;
+use crate::r#move::Move;
 
 pub async fn main() -> Result<(), String> {
     // Try to get the bearer auth token.
@@ -137,7 +138,7 @@ async fn play_game(token: &str, game_id: &str, fen: &str) {
             // TODO: Check for resignation?
 
             // Handle errors later...
-            let last_move = bitboard::Move::str_to_move(&last_move_str).expect("API returned a move we could not convert.");
+            let last_move = Move::str_to_move(&last_move_str).expect("API returned a move we could not convert.");
             let cloned_legal_moves = game.legal_moves.clone();
             for m in cloned_legal_moves.iter() {
                 if *m == last_move {

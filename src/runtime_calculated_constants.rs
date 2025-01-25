@@ -1,6 +1,6 @@
 use crate::constants;
-use crate::bitboard::Color;
-use crate::bitboard::PieceType;
+use crate::color::Color;
+use crate::piece_type::PieceType;
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 
