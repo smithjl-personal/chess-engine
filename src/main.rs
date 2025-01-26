@@ -28,4 +28,6 @@ async fn main() {
     // let (best_eval, best_move) = new_game.iterative_deepening_minimax();
 
     // println!("The best move we found was {} at eval {}.", best_move.unwrap().move_to_str(), best_eval);
+
+    // new_game.print_debug_game_state_str();
 }

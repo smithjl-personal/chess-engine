@@ -76,7 +76,7 @@ async fn play_game(token: &str, game_id: &str, fen: &str) {
 
             // If player types debug in the chat, print some info to the screen.
             if chat_event.text == "debug" {
-                //println!("{}", game.get_debug_game_state_str());
+                game.print_debug_game_state_str();
                 let _ = write_chat_message(
                     token,
                     &lichess_game.id,

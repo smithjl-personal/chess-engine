@@ -2212,109 +2212,26 @@ impl<'a> ChessGame<'a> {
     }
 
 
+    pub fn print_debug_game_state_str(&self) {
+        self.print_board();
+        println!("White to move?: {}", self.white_to_move);
+        println!("Zobrist Hash: {}", self.zobrist_hash);
+        println!("Transposition Table Size: {}", self.transposition_table.len());
 
-
-    pub fn minimax_debug_old(&mut self, depth: u32, mut alpha: i64, mut beta: i64) -> (i64, Option<Move>) {
-        if self.legal_moves.len() == 0 {
-            if self.white_to_move {
-                if self.is_king_attacked(&Color::White) {
-                    return (std::i64::MIN, None);
-                } else {
-                    return (0, None);
-                }
-            } else {
-                if self.is_king_attacked(&Color::Black) {
-                    return (std::i64::MAX, None);
-                } else {
-                    return (0, None);
-                }
-            }
+        print!("En-Passant Target Square: ");
+        match self.en_passant_target {
+            Some(square) => print!("{}.\n", square_to_coord(square)),
+            None => print!("None.\n"),
         }
 
-        if depth == 0 {
-            return (self.evaluate_board(), None);
-        }
+        println!("Castling rights:");
+        println!("\tWhite Castle Short? {}", self.can_white_castle_short);
+        println!("\tWhite Castle Long? {}", self.can_white_castle_long);
+        println!("\tBlack Castle Short? {}", self.can_black_castle_short);
+        println!("\tBlack Castle Long? {}", self.can_black_castle_long);
 
-
-
-        let mut temp_evaluation: i64;
-        let mut evaluation: i64;
-        let mut best_move: Option<Move> = None;
-        let indentation_prefix = debug_depth_to_tabs(depth);
-
-        if self.white_to_move {
-            println!("{}Looking at white's moves...", indentation_prefix);
-            evaluation = std::i64::MIN;
-            for legal_move in self.legal_moves.iter() {
-                println!("{}Making move {} for white...", indentation_prefix , legal_move.move_to_str());
-
-                // Clone the board.
-                let mut game_copy = self.clone();
-                game_copy.make_move(legal_move, true);
-
-                // Apply minimax.
-                (temp_evaluation, _) = game_copy.minimax_debug(depth - 1, alpha, beta);
-
-                // If the evaluation is better, store it.
-                if temp_evaluation > evaluation {
-                    let old_best_move_str = match best_move {
-                        None => "None",
-                        Some(m) => &m.move_to_str(),
-                    };
-
-                    println!("{}Updating evaluation. Best move before was {} with evaluation {}", indentation_prefix, old_best_move_str, evaluation);
-                    println!("{}Now is {} with evaluation {}", indentation_prefix, legal_move.move_to_str(), temp_evaluation);
-
-                    evaluation = temp_evaluation;
-                    best_move = Some(*legal_move);
-                }
-
-                if evaluation > beta {
-                    println!("{}Pruned branch, beta", indentation_prefix);
-                    break;
-                }
-
-                // Update alpha.
-                alpha = i64::max(alpha, evaluation);
-            }
-        } else {
-            println!("{}Looking at black's moves...", indentation_prefix);
-            evaluation = std::i64::MAX;
-            for legal_move in self.legal_moves.iter() {
-                println!("{}Making move {} for black...", indentation_prefix, legal_move.move_to_str());
-
-                // Clone the board.
-                let mut game_copy = self.clone();
-                game_copy.make_move(legal_move, true);
-
-                // Apply minimax.
-                (temp_evaluation, _) = game_copy.minimax_debug(depth - 1, alpha, beta);
-
-                // If the evaluation is better, store it.
-                if temp_evaluation < evaluation {
-                    let old_best_move_str = match best_move {
-                        None => "None",
-                        Some(m) => &m.move_to_str(),
-                    };
-
-                    println!("{}Updating evaluation. Best move before was {} with evaluation {}", indentation_prefix, old_best_move_str, evaluation);
-                    println!("{}Now is {} with evaluation {}", indentation_prefix, legal_move.move_to_str(), temp_evaluation);
-
-                    evaluation = temp_evaluation;
-                    best_move = Some(*legal_move);
-                }
-
-                // Alpha-beta pruning
-                if evaluation < alpha {
-                    println!("{}Pruned branch, alpha", indentation_prefix);
-                    break;
-                }
-
-                beta = i64::min(beta, evaluation);
-            }
-        }
-
-        return (evaluation, best_move);
+        println!("Legal moves:");
+        self.print_legal_moves();
     }
 }
 
