@@ -43,7 +43,6 @@ pub fn get_lsb_index(bitboard: u64) -> Option<usize> {
     return Some(count_bits(populated));
 }
 
-
 // Debugging minimax.
 pub fn debug_depth_to_tabs(mut depth: u32) -> String {
     let mut result = String::new();
@@ -89,7 +88,6 @@ pub fn print_bitboard(bitboard: u64) {
     println!("Bitboard Value: {bitboard}");
 }
 
-
 // Should this be an enum?
 pub fn str_coord_to_square(s: &str) -> Result<usize, String> {
     if s.len() != 2 {
@@ -116,4 +114,3 @@ pub fn str_coord_to_square(s: &str) -> Result<usize, String> {
 
     return Ok(rank * 8 + file);
 }
-

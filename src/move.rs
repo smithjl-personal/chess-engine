@@ -1,6 +1,6 @@
-use crate::piece_type::PieceType;
 use crate::castle_sides::CastleSides;
 use crate::helpers::{square_to_coord, str_coord_to_square};
+use crate::piece_type::PieceType;
 
 // Think about if this is the best way to do this...
 #[derive(Copy, Clone, Debug)]
@@ -22,7 +22,6 @@ pub struct Move {
 
     // Castling
     pub castle_side: Option<CastleSides>,
-
 
     // Populated later, used for move sorting.
     pub is_check: Option<bool>,
@@ -49,7 +48,7 @@ impl Move {
             removes_black_castling_rights_short: None,
             removes_black_castling_rights_long: None,
             is_check: None,
-        }
+        };
     }
 
     pub fn move_to_str(&self) -> String {
@@ -57,7 +56,12 @@ impl Move {
             Some(t) => t.to_char_side_agnostic().to_string(),
             None => String::from(""),
         };
-        return format!("{}{}{}", square_to_coord(self.from_square), square_to_coord(self.to_square), extra_char);
+        return format!(
+            "{}{}{}",
+            square_to_coord(self.from_square),
+            square_to_coord(self.to_square),
+            extra_char
+        );
     }
 
     pub fn str_to_move(text: &str) -> Result<Move, String> {

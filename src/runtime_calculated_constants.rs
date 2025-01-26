@@ -1,5 +1,5 @@
-use crate::constants;
 use crate::color::Color;
+use crate::constants;
 use crate::piece_type::PieceType;
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
@@ -34,7 +34,7 @@ impl Constants {
         let mut pawn_attacks: [[u64; 64]; 2] = [[0; 64]; 2];
         let mut knight_attacks: [u64; 64] = [0; 64];
         let mut king_attacks: [u64; 64] = [0; 64];
-        let mut zobrist_table:  [[u64; 64]; 12] =  [[0; 64]; 12];
+        let mut zobrist_table: [[u64; 64]; 12] = [[0; 64]; 12];
         let mut zobrist_castling_rights: [u64; 4] = [0; 4];
         let mut zobrist_en_passant: [u64; 8] = [0; 8];
 
@@ -43,10 +43,8 @@ impl Constants {
         let mut rook_attacks: Vec<Vec<u64>> = vec![vec![0; 4096]; 64];
 
         for square in 0..64 {
-            pawn_attacks[Color::White.idx()][square] =
-                mask_pawn_attacks(square, Color::White);
-            pawn_attacks[Color::Black.idx()][square] =
-                mask_pawn_attacks(square, Color::Black);
+            pawn_attacks[Color::White.idx()][square] = mask_pawn_attacks(square, Color::White);
+            pawn_attacks[Color::Black.idx()][square] = mask_pawn_attacks(square, Color::Black);
 
             knight_attacks[square] = mask_knight_attacks(square);
             king_attacks[square] = mask_king_attacks(square);
@@ -55,7 +53,10 @@ impl Constants {
         init_slider_attacks(true, &mut bishop_attacks, &mut rook_attacks);
         init_slider_attacks(false, &mut bishop_attacks, &mut rook_attacks);
 
-        let color_offsets: [usize; 2] = [Color::White.piece_bitboard_offset(), Color::Black.piece_bitboard_offset()];
+        let color_offsets: [usize; 2] = [
+            Color::White.piece_bitboard_offset(),
+            Color::Black.piece_bitboard_offset(),
+        ];
         let piece_type_indicies: [usize; 6] = [
             PieceType::Pawn.bitboard_index(),
             PieceType::Bishop.bitboard_index(),
@@ -64,7 +65,6 @@ impl Constants {
             PieceType::Queen.bitboard_index(),
             PieceType::King.bitboard_index(),
         ];
-
 
         // Initialize zobrist table. We use the same seed every time for debugging purposes.
         let mut rng = ChaCha8Rng::seed_from_u64(2);
@@ -98,7 +98,6 @@ impl Constants {
     }
 }
 
-
 pub fn init_slider_attacks(
     is_bishop: bool,
     bishop_attacks: &mut Vec<Vec<u64>>,
@@ -131,7 +130,6 @@ pub fn init_slider_attacks(
         }
     }
 }
-
 
 // Function a bit different than the others, it doesn't actually generate all the attacks...
 pub fn mask_bishop_attacks(square: u64) -> u64 {
@@ -198,7 +196,6 @@ pub fn mask_bishop_attacks(square: u64) -> u64 {
     return attacks;
 }
 
-
 // Function a bit different than the others, it doesn't actually generate all the attacks...
 pub fn dynamic_bishop_attacks(square: u64, block: u64) -> u64 {
     let mut attacks: u64 = 0;
@@ -234,11 +231,11 @@ pub fn dynamic_bishop_attacks(square: u64, block: u64) -> u64 {
         Some(f) => {
             file = f;
             file_underflow = false;
-        },
+        }
         None => {
             file = 0;
             file_underflow = true;
-        },
+        }
     };
     while rank <= 7 && !file_underflow {
         let focus_square: u64 = 1 << (rank * 8 + file);
@@ -262,11 +259,11 @@ pub fn dynamic_bishop_attacks(square: u64, block: u64) -> u64 {
         Some(r) => {
             rank = r;
             rank_underflow = false;
-        },
+        }
         None => {
             rank = 0;
             rank_underflow = true;
-        },
+        }
     };
     file = target_file + 1;
     while file <= 7 && !rank_underflow {
@@ -290,21 +287,21 @@ pub fn dynamic_bishop_attacks(square: u64, block: u64) -> u64 {
         Some(r) => {
             rank = r;
             rank_underflow = false;
-        },
+        }
         None => {
             rank = 0;
             rank_underflow = true;
-        },
+        }
     };
     match target_file.checked_sub(1) {
         Some(f) => {
             file = f;
             file_underflow = false;
-        },
+        }
         None => {
             file = 0;
             file_underflow = true;
-        },
+        }
     };
     while !rank_underflow && !file_underflow {
         let focus_square: u64 = 1 << (rank * 8 + file);
@@ -327,7 +324,6 @@ pub fn dynamic_bishop_attacks(square: u64, block: u64) -> u64 {
 
     return attacks;
 }
-
 
 // Function a bit different than the others, it doesn't actually generate all the attacks...
 pub fn mask_rook_attacks(square: u64) -> u64 {
@@ -465,7 +461,6 @@ pub fn dynamic_rook_attacks(square: u64, block: u64) -> u64 {
     return attacks;
 }
 
-
 // I don't understand how this works yet...
 pub fn set_occupancies(index: usize, bits_in_mask: usize, mut attack_mask: u64) -> u64 {
     let mut occupancy: u64 = 0;
@@ -491,8 +486,6 @@ pub fn set_occupancies(index: usize, bits_in_mask: usize, mut attack_mask: u64) 
 
     return occupancy;
 }
-
-
 
 pub fn mask_pawn_attacks(square: usize, side: Color) -> u64 {
     let mut attacks: u64 = 0;
@@ -564,10 +557,6 @@ pub fn mask_king_attacks(square: usize) -> u64 {
     return attacks;
 }
 
-
-
-
-
 // Should these be macros? Or something similar?
 pub fn get_bit(bitboard: u64, square: usize) -> u64 {
     return bitboard & (1 << square);
@@ -612,8 +601,6 @@ pub fn get_lsb_index(bitboard: u64) -> Option<usize> {
 
     return Some(count_bits(populated));
 }
-
-
 
 /*
     // This is the code we used to generate magic numbers. We don't need to run it again, but it should remain. Somewhere.

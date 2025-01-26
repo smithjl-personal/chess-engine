@@ -1,6 +1,5 @@
 use crate::r#move::Move;
 
-
 #[derive(Clone)]
 pub struct TranspositionTableEntry {
     pub zobrist_hash: u64,

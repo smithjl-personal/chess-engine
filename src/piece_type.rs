@@ -1,5 +1,5 @@
-use crate::constants;
 use crate::color::Color;
+use crate::constants;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum PieceType {
@@ -44,7 +44,7 @@ impl PieceType {
                     // Get the value.
                     return constants::PAWN_HAPPY_SQUARES[new_square];
                 }
-            },
+            }
         };
     }
 
@@ -104,7 +104,7 @@ impl PieceType {
             5 => Self::King,
             _ => {
                 panic!("Something has gone wrong converting bitboard index to piece type.");
-            },
+            }
         };
     }
 }

@@ -1,13 +1,13 @@
+use crate::castle_sides::CastleSides;
+use crate::color::Color;
 use crate::constants;
+use crate::helpers::*;
+use crate::piece_type::PieceType;
+use crate::r#move::Move;
 use crate::runtime_calculated_constants::Constants;
 use crate::transposition_table_entry::{TranspositionTableEntry, TranspositionTableNodeType};
-use crate::r#move::Move;
-use crate::color::Color;
-use crate::castle_sides::CastleSides;
-use crate::piece_type::PieceType;
-use crate::helpers::*;
-use std::io;
 use std::collections::HashMap;
+use std::io;
 
 // TODO: Research more on lifetime stuff.
 #[derive(Clone)]
@@ -79,15 +79,21 @@ impl<'a> ChessGame<'a> {
         };
     }
 
-    pub fn debug_verify_board_state(&self, this_move: &Move, prev_game_state: ChessGame, called_by: &str) {
-
-
-
+    pub fn debug_verify_board_state(
+        &self,
+        this_move: &Move,
+        prev_game_state: ChessGame,
+        called_by: &str,
+    ) {
         // Make sure occupancies add up corrrectly.
-        if self.occupancy_bitboards[2] != self.occupancy_bitboards[0] | self.occupancy_bitboards[1] {
+        if self.occupancy_bitboards[2] != self.occupancy_bitboards[0] | self.occupancy_bitboards[1]
+        {
             println!("Previous game state");
             prev_game_state.print_board();
-            println!("Tried to make/unmake move: {:#?}\n\n Ended up with:", this_move);
+            println!(
+                "Tried to make/unmake move: {:#?}\n\n Ended up with:",
+                this_move
+            );
 
             println!("White occupancies before:");
             print_bitboard(prev_game_state.occupancy_bitboards[0]);
@@ -115,7 +121,10 @@ impl<'a> ChessGame<'a> {
         if self.occupancy_bitboards[0] != constructed_occupancies_white {
             println!("Previous game state");
             prev_game_state.print_board();
-            println!("Tried to make/unmake move: {:#?}\n\n Ended up with:", this_move);
+            println!(
+                "Tried to make/unmake move: {:#?}\n\n Ended up with:",
+                this_move
+            );
 
             println!("White rooks before:");
             print_bitboard(prev_game_state.piece_bitboards[PieceType::Rook.bitboard_index()]);
@@ -138,12 +147,13 @@ impl<'a> ChessGame<'a> {
         if self.occupancy_bitboards[1] != constructed_occupancies_black {
             println!("Previous game state");
             prev_game_state.print_board();
-            println!("Tried to make/unmake move: {:#?}\n\n Ended up with:", this_move);
+            println!(
+                "Tried to make/unmake move: {:#?}\n\n Ended up with:",
+                this_move
+            );
 
             panic!("Black pieces desynced by {called_by}.");
         }
-
-
     }
 
     // Takes all pieces off the board.
@@ -239,7 +249,8 @@ impl<'a> ChessGame<'a> {
                 self.place_piece_on_board(piece_color, piece_type, square);
 
                 // Update the zobrist hash.
-                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[piece_type.bitboard_index() + piece_color.piece_bitboard_offset()][square];
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table
+                    [piece_type.bitboard_index() + piece_color.piece_bitboard_offset()][square];
 
                 x_pos += 1;
             }
@@ -300,19 +311,19 @@ impl<'a> ChessGame<'a> {
                         'K' => {
                             self.can_white_castle_short = true;
                             self.zobrist_hash ^= self.bitboard_constants.zobrist_castling_rights[0];
-                        },
+                        }
                         'Q' => {
                             self.can_white_castle_long = true;
                             self.zobrist_hash ^= self.bitboard_constants.zobrist_castling_rights[1];
-                        },
+                        }
                         'k' => {
                             self.can_black_castle_short = true;
                             self.zobrist_hash ^= self.bitboard_constants.zobrist_castling_rights[2];
-                        },
+                        }
                         'q' => {
                             self.can_black_castle_long = true;
                             self.zobrist_hash ^= self.bitboard_constants.zobrist_castling_rights[3];
-                        },
+                        }
                         _ => (),
                     }
                 }
@@ -340,13 +351,11 @@ impl<'a> ChessGame<'a> {
         return Ok(());
     }
 
-
     pub fn export_fen(&self) -> String {
         let mut fen = String::new();
         let mut prior_empty_count = 0;
         let mut file;
         for square in 0..64 {
-
             // Track our file.
             file = square % 8;
 
@@ -355,7 +364,6 @@ impl<'a> ChessGame<'a> {
 
             match piece_option {
                 Some(piece) => {
-
                     // If we had spaces before, print that and reset.
                     if prior_empty_count > 0 {
                         fen += &prior_empty_count.to_string();
@@ -372,7 +380,6 @@ impl<'a> ChessGame<'a> {
 
             // If we are on the last file
             if file == 7 {
-
                 // If we have any empties, output the number.
                 if prior_empty_count > 0 {
                     fen += &prior_empty_count.to_string();
@@ -410,11 +417,11 @@ impl<'a> ChessGame<'a> {
         }
 
         // Special case if no casting rights available.
-        if
-            !self.can_white_castle_short
-            &&!self.can_white_castle_long
-            &&!self.can_black_castle_short
-            &&!self.can_black_castle_long {
+        if !self.can_white_castle_short
+            && !self.can_white_castle_long
+            && !self.can_black_castle_short
+            && !self.can_black_castle_long
+        {
             fen += "-";
         }
 
@@ -422,7 +429,7 @@ impl<'a> ChessGame<'a> {
         fen += " ";
         match self.en_passant_target {
             Some(square) => fen += &square_to_coord(square),
-            None => fen += "-"
+            None => fen += "-",
         }
 
         // Ehhh, at some point add the half moves since last capture or pawn advance. And the full move count.
@@ -431,14 +438,15 @@ impl<'a> ChessGame<'a> {
     }
 
     pub fn place_piece_on_board(&mut self, side: Color, piece_type: PieceType, square: usize) {
-
         // Piece bitboard.
         let piece_bitboard_index = piece_type.bitboard_index() + side.piece_bitboard_offset();
-        self.piece_bitboards[piece_bitboard_index] = set_bit(self.piece_bitboards[piece_bitboard_index], square);
+        self.piece_bitboards[piece_bitboard_index] =
+            set_bit(self.piece_bitboards[piece_bitboard_index], square);
 
         // Color occupancies.
         let occupancy_bitboard_index = side.occupancy_bitboard_index();
-        self.occupancy_bitboards[occupancy_bitboard_index] = set_bit(self.occupancy_bitboards[occupancy_bitboard_index], square);
+        self.occupancy_bitboards[occupancy_bitboard_index] =
+            set_bit(self.occupancy_bitboards[occupancy_bitboard_index], square);
 
         // All occupancies.
         self.occupancy_bitboards[2] = set_bit(self.occupancy_bitboards[2], square);
@@ -468,7 +476,10 @@ impl<'a> ChessGame<'a> {
         // Loop over all the piece bitboards until we find the piece we want.
         for i in start_bitboard_index..start_bitboard_index + 6 {
             if get_bit(self.piece_bitboards[i], square) != 0 {
-                return (Some(PieceType::bitboard_index_to_piece_type(i)), Some(piece_color));
+                return (
+                    Some(PieceType::bitboard_index_to_piece_type(i)),
+                    Some(piece_color),
+                );
             }
         }
 
@@ -486,33 +497,49 @@ impl<'a> ChessGame<'a> {
 
         // Pawns.
         if self.bitboard_constants.pawn_attacks[opponent_pawn_attacks_index][square]
-            & self.piece_bitboards[0 + piece_bitboard_offset] != 0
+            & self.piece_bitboards[0 + piece_bitboard_offset]
+            != 0
         {
             return true;
         }
 
         // Bishops.
-        if self.get_bishop_attacks(square, all_occupancies) & self.piece_bitboards[1 + piece_bitboard_offset] != 0 {
+        if self.get_bishop_attacks(square, all_occupancies)
+            & self.piece_bitboards[1 + piece_bitboard_offset]
+            != 0
+        {
             return true;
         }
 
         // Knights.
-        if self.bitboard_constants.knight_attacks[square] & self.piece_bitboards[2 + piece_bitboard_offset] != 0 {
+        if self.bitboard_constants.knight_attacks[square]
+            & self.piece_bitboards[2 + piece_bitboard_offset]
+            != 0
+        {
             return true;
         }
 
         // Rooks.
-        if self.get_rook_attacks(square, all_occupancies) & self.piece_bitboards[3 + piece_bitboard_offset] != 0 {
+        if self.get_rook_attacks(square, all_occupancies)
+            & self.piece_bitboards[3 + piece_bitboard_offset]
+            != 0
+        {
             return true;
         }
 
         // Queens. (we could speed this up slightly... look here for optimization if needed.)
-        if self.get_queen_attacks(square, all_occupancies) & self.piece_bitboards[4 + piece_bitboard_offset] != 0 {
+        if self.get_queen_attacks(square, all_occupancies)
+            & self.piece_bitboards[4 + piece_bitboard_offset]
+            != 0
+        {
             return true;
         }
 
         // King.
-        if self.bitboard_constants.king_attacks[square] & self.piece_bitboards[5 + piece_bitboard_offset] != 0 {
+        if self.bitboard_constants.king_attacks[square]
+            & self.piece_bitboards[5 + piece_bitboard_offset]
+            != 0
+        {
             return true;
         }
 
@@ -541,11 +568,12 @@ impl<'a> ChessGame<'a> {
             | self.get_rook_attacks(square, occupancy);
     }
 
-
     pub fn make_move(&mut self, this_move: &Move, update_legal_moves: bool) {
         //let debug_initial_game_state = self.clone();
 
-        let source_piece = this_move.from_piece_type.expect("This should always be here.");
+        let source_piece = this_move
+            .from_piece_type
+            .expect("This should always be here.");
 
         // Handle generic captures, and en-passant captures.
         let our_color: Color;
@@ -560,7 +588,8 @@ impl<'a> ChessGame<'a> {
         }
 
         let our_piece_bitboard_offset: usize = our_color.piece_bitboard_offset();
-        let our_piece_bitboard_index: usize = our_piece_bitboard_offset + source_piece.bitboard_index();
+        let our_piece_bitboard_index: usize =
+            our_piece_bitboard_offset + source_piece.bitboard_index();
         let our_occupancies_index: usize = our_color.occupancy_bitboard_index();
         let their_piece_bitboard_offset: usize = their_color.piece_bitboard_offset();
         let their_occupancies_index: usize = their_color.occupancy_bitboard_index();
@@ -569,43 +598,95 @@ impl<'a> ChessGame<'a> {
         // This does not handle castling, and en-passant logic.
         match source_piece {
             PieceType::Pawn => {
-                self.piece_bitboards[our_piece_bitboard_index] = pop_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.from_square);
-                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_index][this_move.from_square];
+                self.piece_bitboards[our_piece_bitboard_index] = pop_bit(
+                    self.piece_bitboards[our_piece_bitboard_index],
+                    this_move.from_square,
+                );
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table
+                    [our_piece_bitboard_index][this_move.from_square];
 
                 // Special logic for pawn promotion.
                 match this_move.pawn_promoting_to {
                     Some(piece_promoted_to) => {
                         match piece_promoted_to {
-                            PieceType::Queen => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = set_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
-                            PieceType::Rook => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = set_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
-                            PieceType::Bishop => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = set_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
-                            PieceType::Knight => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = set_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
+                            PieceType::Queen => {
+                                self.piece_bitboards[our_piece_bitboard_offset
+                                    + piece_promoted_to.bitboard_index()] = set_bit(
+                                    self.piece_bitboards[our_piece_bitboard_offset
+                                        + piece_promoted_to.bitboard_index()],
+                                    this_move.to_square,
+                                )
+                            }
+                            PieceType::Rook => {
+                                self.piece_bitboards[our_piece_bitboard_offset
+                                    + piece_promoted_to.bitboard_index()] = set_bit(
+                                    self.piece_bitboards[our_piece_bitboard_offset
+                                        + piece_promoted_to.bitboard_index()],
+                                    this_move.to_square,
+                                )
+                            }
+                            PieceType::Bishop => {
+                                self.piece_bitboards[our_piece_bitboard_offset
+                                    + piece_promoted_to.bitboard_index()] = set_bit(
+                                    self.piece_bitboards[our_piece_bitboard_offset
+                                        + piece_promoted_to.bitboard_index()],
+                                    this_move.to_square,
+                                )
+                            }
+                            PieceType::Knight => {
+                                self.piece_bitboards[our_piece_bitboard_offset
+                                    + piece_promoted_to.bitboard_index()] = set_bit(
+                                    self.piece_bitboards[our_piece_bitboard_offset
+                                        + piece_promoted_to.bitboard_index()],
+                                    this_move.to_square,
+                                )
+                            }
                             _ => panic!("Tried to promote to an illegal piece."),
                         }
-                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()][this_move.to_square];
-                    },
+                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table
+                            [our_piece_bitboard_offset + piece_promoted_to.bitboard_index()]
+                            [this_move.to_square];
+                    }
 
                     // Otherwise, it's a normal pawn move.
                     None => {
-                        self.piece_bitboards[our_piece_bitboard_index] = set_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.to_square);
-                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_index][this_move.to_square];
-                    },
+                        self.piece_bitboards[our_piece_bitboard_index] = set_bit(
+                            self.piece_bitboards[our_piece_bitboard_index],
+                            this_move.to_square,
+                        );
+                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table
+                            [our_piece_bitboard_index][this_move.to_square];
+                    }
                 }
-            },
+            }
 
             // Every other piece, remove it from the source, place it at the destination.
             _ => {
-                self.piece_bitboards[our_piece_bitboard_index] = pop_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.from_square);
-                self.piece_bitboards[our_piece_bitboard_index] = set_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.to_square);
+                self.piece_bitboards[our_piece_bitboard_index] = pop_bit(
+                    self.piece_bitboards[our_piece_bitboard_index],
+                    this_move.from_square,
+                );
+                self.piece_bitboards[our_piece_bitboard_index] = set_bit(
+                    self.piece_bitboards[our_piece_bitboard_index],
+                    this_move.to_square,
+                );
 
-                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_index][this_move.from_square];
-                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_index][this_move.to_square];
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table
+                    [our_piece_bitboard_index][this_move.from_square];
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table
+                    [our_piece_bitboard_index][this_move.to_square];
             }
         }
 
         // Update our occupancies.
-        self.occupancy_bitboards[our_occupancies_index] = pop_bit(self.occupancy_bitboards[our_occupancies_index], this_move.from_square);
-        self.occupancy_bitboards[our_occupancies_index] = set_bit(self.occupancy_bitboards[our_occupancies_index], this_move.to_square);
+        self.occupancy_bitboards[our_occupancies_index] = pop_bit(
+            self.occupancy_bitboards[our_occupancies_index],
+            this_move.from_square,
+        );
+        self.occupancy_bitboards[our_occupancies_index] = set_bit(
+            self.occupancy_bitboards[our_occupancies_index],
+            this_move.to_square,
+        );
 
         // Update all occupancies, source piece always moves.
         self.occupancy_bitboards[2] = pop_bit(self.occupancy_bitboards[2], this_move.from_square);
@@ -615,50 +696,77 @@ impl<'a> ChessGame<'a> {
         if !is_capture {
             self.occupancy_bitboards[2] = set_bit(self.occupancy_bitboards[2], this_move.to_square);
         } else {
-            let their_piece = this_move.to_piece_type.expect("Should be here, thanks to guard.");
-            let their_piece_bitboard_index = their_piece.bitboard_index() + their_piece_bitboard_offset;
+            let their_piece = this_move
+                .to_piece_type
+                .expect("Should be here, thanks to guard.");
+            let their_piece_bitboard_index =
+                their_piece.bitboard_index() + their_piece_bitboard_offset;
 
             // Remove their piece from the square; and update their occupancies.
             match their_piece {
                 // For pawn captures, handle en-passant.
                 PieceType::Pawn => {
                     if this_move.is_en_passant_capture {
-
                         // Place our pawn on the target square. Normal captures do not need to update this, but en-passant does.
-                        self.occupancy_bitboards[2] = set_bit(self.occupancy_bitboards[2], this_move.to_square);
+                        self.occupancy_bitboards[2] =
+                            set_bit(self.occupancy_bitboards[2], this_move.to_square);
                         let en_passant_target_pawn_index: usize = match their_color {
-                            Color::White => { this_move.to_square - 8 },
-                            Color::Black => { this_move.to_square + 8 },
+                            Color::White => this_move.to_square - 8,
+                            Color::Black => this_move.to_square + 8,
                         };
 
                         // Remove their pawn we captured en-passant.
-                        self.piece_bitboards[their_piece_bitboard_offset + their_piece.bitboard_index()] = pop_bit(self.piece_bitboards[their_piece_bitboard_offset + their_piece.bitboard_index()], en_passant_target_pawn_index);
-                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table[their_piece_bitboard_offset + their_piece.bitboard_index()][en_passant_target_pawn_index];
+                        self.piece_bitboards
+                            [their_piece_bitboard_offset + their_piece.bitboard_index()] = pop_bit(
+                            self.piece_bitboards
+                                [their_piece_bitboard_offset + their_piece.bitboard_index()],
+                            en_passant_target_pawn_index,
+                        );
+                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table
+                            [their_piece_bitboard_offset + their_piece.bitboard_index()]
+                            [en_passant_target_pawn_index];
 
                         // Remove their occupancy.
-                        self.occupancy_bitboards[their_occupancies_index] = pop_bit(self.occupancy_bitboards[their_occupancies_index], en_passant_target_pawn_index);
+                        self.occupancy_bitboards[their_occupancies_index] = pop_bit(
+                            self.occupancy_bitboards[their_occupancies_index],
+                            en_passant_target_pawn_index,
+                        );
 
                         // Remove global occupancy.
-                        self.occupancy_bitboards[2] = pop_bit(self.occupancy_bitboards[2], en_passant_target_pawn_index);
+                        self.occupancy_bitboards[2] =
+                            pop_bit(self.occupancy_bitboards[2], en_passant_target_pawn_index);
                     } else {
                         // Remove that piece from the board.
-                        self.piece_bitboards[their_piece_bitboard_index] = pop_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
-                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table[their_piece_bitboard_index][this_move.to_square];
+                        self.piece_bitboards[their_piece_bitboard_index] = pop_bit(
+                            self.piece_bitboards[their_piece_bitboard_index],
+                            this_move.to_square,
+                        );
+                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table
+                            [their_piece_bitboard_index][this_move.to_square];
 
                         // Update their occupancies.
-                        self.occupancy_bitboards[their_occupancies_index] = pop_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
+                        self.occupancy_bitboards[their_occupancies_index] = pop_bit(
+                            self.occupancy_bitboards[their_occupancies_index],
+                            this_move.to_square,
+                        );
                     }
-                },
+                }
 
                 // For all non-pawn captures...
                 _ => {
-
                     // Remove that piece from the board.
-                    self.piece_bitboards[their_piece_bitboard_index] = pop_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
-                    self.zobrist_hash ^= self.bitboard_constants.zobrist_table[their_piece_bitboard_index][this_move.to_square];
+                    self.piece_bitboards[their_piece_bitboard_index] = pop_bit(
+                        self.piece_bitboards[their_piece_bitboard_index],
+                        this_move.to_square,
+                    );
+                    self.zobrist_hash ^= self.bitboard_constants.zobrist_table
+                        [their_piece_bitboard_index][this_move.to_square];
 
                     // Update their occupancies.
-                    self.occupancy_bitboards[their_occupancies_index] = pop_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
+                    self.occupancy_bitboards[their_occupancies_index] = pop_bit(
+                        self.occupancy_bitboards[their_occupancies_index],
+                        this_move.to_square,
+                    );
                 }
             }
         }
@@ -678,20 +786,35 @@ impl<'a> ChessGame<'a> {
                 };
 
                 // Move our rook over.
-                let rook_bitboard_index = our_piece_bitboard_offset + PieceType::Rook.bitboard_index();
-                self.piece_bitboards[rook_bitboard_index] = pop_bit(self.piece_bitboards[rook_bitboard_index], rook_from_position);
-                self.piece_bitboards[rook_bitboard_index] = set_bit(self.piece_bitboards[rook_bitboard_index], rook_to_position);
+                let rook_bitboard_index =
+                    our_piece_bitboard_offset + PieceType::Rook.bitboard_index();
+                self.piece_bitboards[rook_bitboard_index] = pop_bit(
+                    self.piece_bitboards[rook_bitboard_index],
+                    rook_from_position,
+                );
+                self.piece_bitboards[rook_bitboard_index] =
+                    set_bit(self.piece_bitboards[rook_bitboard_index], rook_to_position);
 
-                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[rook_bitboard_index][rook_from_position];
-                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[rook_bitboard_index][rook_to_position];
+                self.zobrist_hash ^=
+                    self.bitboard_constants.zobrist_table[rook_bitboard_index][rook_from_position];
+                self.zobrist_hash ^=
+                    self.bitboard_constants.zobrist_table[rook_bitboard_index][rook_to_position];
 
                 // Update our occupancies.
-                self.occupancy_bitboards[our_occupancies_index] = pop_bit(self.occupancy_bitboards[our_occupancies_index], rook_from_position);
-                self.occupancy_bitboards[our_occupancies_index] = set_bit(self.occupancy_bitboards[our_occupancies_index], rook_to_position);
+                self.occupancy_bitboards[our_occupancies_index] = pop_bit(
+                    self.occupancy_bitboards[our_occupancies_index],
+                    rook_from_position,
+                );
+                self.occupancy_bitboards[our_occupancies_index] = set_bit(
+                    self.occupancy_bitboards[our_occupancies_index],
+                    rook_to_position,
+                );
 
                 // Update global occupancies.
-                self.occupancy_bitboards[2] = pop_bit(self.occupancy_bitboards[2], rook_from_position);
-                self.occupancy_bitboards[2] = set_bit(self.occupancy_bitboards[2], rook_to_position);
+                self.occupancy_bitboards[2] =
+                    pop_bit(self.occupancy_bitboards[2], rook_from_position);
+                self.occupancy_bitboards[2] =
+                    set_bit(self.occupancy_bitboards[2], rook_to_position);
             }
         }
 
@@ -720,13 +843,13 @@ impl<'a> ChessGame<'a> {
         match this_move.next_en_passant_target_coord {
             Some(square) => {
                 self.zobrist_hash ^= self.bitboard_constants.zobrist_en_passant[square % 8];
-            },
+            }
             None => (),
         }
         match this_move.last_en_passant_target_coord {
             Some(square) => {
                 self.zobrist_hash ^= self.bitboard_constants.zobrist_en_passant[square % 8];
-            },
+            }
             None => (),
         }
 
@@ -734,11 +857,7 @@ impl<'a> ChessGame<'a> {
         self.white_to_move = !self.white_to_move;
         self.zobrist_hash ^= self.bitboard_constants.zobrist_to_move;
 
-
-
         if update_legal_moves {
-            
-
             // Update our moves!
             self.set_legal_moves(None);
         }
@@ -747,11 +866,12 @@ impl<'a> ChessGame<'a> {
         //self.debug_verify_board_state(this_move, debug_initial_game_state, "Make Move");
     }
 
-
     pub fn unmake_move(&mut self, this_move: &Move) {
         //let debug_initial_game_state = self.clone();
 
-        let source_piece = this_move.from_piece_type.expect("This should always be here.");
+        let source_piece = this_move
+            .from_piece_type
+            .expect("This should always be here.");
 
         // Handle generic captures, and en-passant captures.
         let our_color: Color;
@@ -767,7 +887,8 @@ impl<'a> ChessGame<'a> {
         }
 
         let our_piece_bitboard_offset: usize = our_color.piece_bitboard_offset();
-        let our_piece_bitboard_index: usize = our_piece_bitboard_offset + source_piece.bitboard_index();
+        let our_piece_bitboard_index: usize =
+            our_piece_bitboard_offset + source_piece.bitboard_index();
         let our_occupancies_index: usize = our_color.occupancy_bitboard_index();
         let their_piece_bitboard_offset: usize = their_color.piece_bitboard_offset();
         let their_occupancies_index: usize = their_color.occupancy_bitboard_index();
@@ -775,41 +896,92 @@ impl<'a> ChessGame<'a> {
         // Place the piece back it's starting square.
         match source_piece {
             PieceType::Pawn => {
-                self.piece_bitboards[our_piece_bitboard_index] = set_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.from_square);
-                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_index][this_move.from_square];
+                self.piece_bitboards[our_piece_bitboard_index] = set_bit(
+                    self.piece_bitboards[our_piece_bitboard_index],
+                    this_move.from_square,
+                );
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table
+                    [our_piece_bitboard_index][this_move.from_square];
 
                 // Special logic for pawn DEMOTION.
                 match this_move.pawn_promoting_to {
                     Some(piece_promoted_to) => {
                         match piece_promoted_to {
-                            PieceType::Queen => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = pop_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
-                            PieceType::Rook => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = pop_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
-                            PieceType::Bishop => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = pop_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
-                            PieceType::Knight => self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()] = pop_bit(self.piece_bitboards[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()], this_move.to_square),
+                            PieceType::Queen => {
+                                self.piece_bitboards[our_piece_bitboard_offset
+                                    + piece_promoted_to.bitboard_index()] = pop_bit(
+                                    self.piece_bitboards[our_piece_bitboard_offset
+                                        + piece_promoted_to.bitboard_index()],
+                                    this_move.to_square,
+                                )
+                            }
+                            PieceType::Rook => {
+                                self.piece_bitboards[our_piece_bitboard_offset
+                                    + piece_promoted_to.bitboard_index()] = pop_bit(
+                                    self.piece_bitboards[our_piece_bitboard_offset
+                                        + piece_promoted_to.bitboard_index()],
+                                    this_move.to_square,
+                                )
+                            }
+                            PieceType::Bishop => {
+                                self.piece_bitboards[our_piece_bitboard_offset
+                                    + piece_promoted_to.bitboard_index()] = pop_bit(
+                                    self.piece_bitboards[our_piece_bitboard_offset
+                                        + piece_promoted_to.bitboard_index()],
+                                    this_move.to_square,
+                                )
+                            }
+                            PieceType::Knight => {
+                                self.piece_bitboards[our_piece_bitboard_offset
+                                    + piece_promoted_to.bitboard_index()] = pop_bit(
+                                    self.piece_bitboards[our_piece_bitboard_offset
+                                        + piece_promoted_to.bitboard_index()],
+                                    this_move.to_square,
+                                )
+                            }
                             _ => panic!("Tried to promote to an illegal piece."),
                         }
-                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_offset + piece_promoted_to.bitboard_index()][this_move.to_square];
-                    },
+                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table
+                            [our_piece_bitboard_offset + piece_promoted_to.bitboard_index()]
+                            [this_move.to_square];
+                    }
                     None => {
-                        self.piece_bitboards[our_piece_bitboard_index] = pop_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.to_square);
-                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_index][this_move.to_square];
-                    },
+                        self.piece_bitboards[our_piece_bitboard_index] = pop_bit(
+                            self.piece_bitboards[our_piece_bitboard_index],
+                            this_move.to_square,
+                        );
+                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table
+                            [our_piece_bitboard_index][this_move.to_square];
+                    }
                 }
-                
-            },
+            }
 
             // Every other piece, remove it from the destination, place it at the source.
             _ => {
-                self.piece_bitboards[our_piece_bitboard_index] = pop_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.to_square);
-                self.piece_bitboards[our_piece_bitboard_index] = set_bit(self.piece_bitboards[our_piece_bitboard_index], this_move.from_square);
-                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_index][this_move.to_square];
-                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[our_piece_bitboard_index][this_move.from_square];
+                self.piece_bitboards[our_piece_bitboard_index] = pop_bit(
+                    self.piece_bitboards[our_piece_bitboard_index],
+                    this_move.to_square,
+                );
+                self.piece_bitboards[our_piece_bitboard_index] = set_bit(
+                    self.piece_bitboards[our_piece_bitboard_index],
+                    this_move.from_square,
+                );
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table
+                    [our_piece_bitboard_index][this_move.to_square];
+                self.zobrist_hash ^= self.bitboard_constants.zobrist_table
+                    [our_piece_bitboard_index][this_move.from_square];
             }
         }
 
         // Update our occupancies.
-        self.occupancy_bitboards[our_occupancies_index] = pop_bit(self.occupancy_bitboards[our_occupancies_index], this_move.to_square);
-        self.occupancy_bitboards[our_occupancies_index] = set_bit(self.occupancy_bitboards[our_occupancies_index], this_move.from_square);
+        self.occupancy_bitboards[our_occupancies_index] = pop_bit(
+            self.occupancy_bitboards[our_occupancies_index],
+            this_move.to_square,
+        );
+        self.occupancy_bitboards[our_occupancies_index] = set_bit(
+            self.occupancy_bitboards[our_occupancies_index],
+            this_move.from_square,
+        );
 
         // Update all occupancies, source piece always moves.
         self.occupancy_bitboards[2] = set_bit(self.occupancy_bitboards[2], this_move.from_square);
@@ -819,50 +991,77 @@ impl<'a> ChessGame<'a> {
         if !is_capture {
             self.occupancy_bitboards[2] = pop_bit(self.occupancy_bitboards[2], this_move.to_square);
         } else {
-            let their_piece = this_move.to_piece_type.expect("Should be here, thanks to guard.");
-            let their_piece_bitboard_index = their_piece.bitboard_index() + their_piece_bitboard_offset;
+            let their_piece = this_move
+                .to_piece_type
+                .expect("Should be here, thanks to guard.");
+            let their_piece_bitboard_index =
+                their_piece.bitboard_index() + their_piece_bitboard_offset;
 
             // Place their piece on the square; and update their occupancies.
             match their_piece {
                 // For pawn captures, handle en-passant.
                 PieceType::Pawn => {
                     if this_move.is_en_passant_capture {
-
                         // Remove our pawn from the target square. Normal captures do not need to update this, but en-passant does.
-                        self.occupancy_bitboards[2] = pop_bit(self.occupancy_bitboards[2], this_move.to_square);
+                        self.occupancy_bitboards[2] =
+                            pop_bit(self.occupancy_bitboards[2], this_move.to_square);
                         let en_passant_target_pawn_index: usize = match their_color {
-                            Color::White => { this_move.to_square - 8 },
-                            Color::Black => { this_move.to_square + 8 },
+                            Color::White => this_move.to_square - 8,
+                            Color::Black => this_move.to_square + 8,
                         };
 
                         // Add their pawn we captured en-passant.
-                        self.piece_bitboards[their_piece_bitboard_offset + their_piece.bitboard_index()] = set_bit(self.piece_bitboards[their_piece_bitboard_offset + their_piece.bitboard_index()], en_passant_target_pawn_index);
-                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table[their_piece_bitboard_offset + their_piece.bitboard_index()][en_passant_target_pawn_index];
+                        self.piece_bitboards
+                            [their_piece_bitboard_offset + their_piece.bitboard_index()] = set_bit(
+                            self.piece_bitboards
+                                [their_piece_bitboard_offset + their_piece.bitboard_index()],
+                            en_passant_target_pawn_index,
+                        );
+                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table
+                            [their_piece_bitboard_offset + their_piece.bitboard_index()]
+                            [en_passant_target_pawn_index];
 
                         // Add their occupancy.
-                        self.occupancy_bitboards[their_occupancies_index] = set_bit(self.occupancy_bitboards[their_occupancies_index], en_passant_target_pawn_index);
+                        self.occupancy_bitboards[their_occupancies_index] = set_bit(
+                            self.occupancy_bitboards[their_occupancies_index],
+                            en_passant_target_pawn_index,
+                        );
 
                         // Add global occupancy.
-                        self.occupancy_bitboards[2] = set_bit(self.occupancy_bitboards[2], en_passant_target_pawn_index);
+                        self.occupancy_bitboards[2] =
+                            set_bit(self.occupancy_bitboards[2], en_passant_target_pawn_index);
                     } else {
                         // Add that piece from the board.
-                        self.piece_bitboards[their_piece_bitboard_index] = set_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
-                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table[their_piece_bitboard_index][this_move.to_square];
+                        self.piece_bitboards[their_piece_bitboard_index] = set_bit(
+                            self.piece_bitboards[their_piece_bitboard_index],
+                            this_move.to_square,
+                        );
+                        self.zobrist_hash ^= self.bitboard_constants.zobrist_table
+                            [their_piece_bitboard_index][this_move.to_square];
 
                         // Update their occupancies.
-                        self.occupancy_bitboards[their_occupancies_index] = set_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
+                        self.occupancy_bitboards[their_occupancies_index] = set_bit(
+                            self.occupancy_bitboards[their_occupancies_index],
+                            this_move.to_square,
+                        );
                     }
-                },
+                }
 
                 // For all non-pawn captures...
                 _ => {
-
                     // Add that piece from the board.
-                    self.piece_bitboards[their_piece_bitboard_index] = set_bit(self.piece_bitboards[their_piece_bitboard_index], this_move.to_square);
-                    self.zobrist_hash ^= self.bitboard_constants.zobrist_table[their_piece_bitboard_index][this_move.to_square];
+                    self.piece_bitboards[their_piece_bitboard_index] = set_bit(
+                        self.piece_bitboards[their_piece_bitboard_index],
+                        this_move.to_square,
+                    );
+                    self.zobrist_hash ^= self.bitboard_constants.zobrist_table
+                        [their_piece_bitboard_index][this_move.to_square];
 
                     // Update their occupancies.
-                    self.occupancy_bitboards[their_occupancies_index] = set_bit(self.occupancy_bitboards[their_occupancies_index], this_move.to_square);
+                    self.occupancy_bitboards[their_occupancies_index] = set_bit(
+                        self.occupancy_bitboards[their_occupancies_index],
+                        this_move.to_square,
+                    );
                 }
             }
         }
@@ -882,20 +1081,35 @@ impl<'a> ChessGame<'a> {
                 };
 
                 // Move our rook back.
-                let rook_bitboard_index = our_piece_bitboard_offset + PieceType::Rook.bitboard_index();
-                self.piece_bitboards[rook_bitboard_index] = set_bit(self.piece_bitboards[rook_bitboard_index], rook_from_position);
-                self.piece_bitboards[rook_bitboard_index] = pop_bit(self.piece_bitboards[rook_bitboard_index], rook_to_position);
+                let rook_bitboard_index =
+                    our_piece_bitboard_offset + PieceType::Rook.bitboard_index();
+                self.piece_bitboards[rook_bitboard_index] = set_bit(
+                    self.piece_bitboards[rook_bitboard_index],
+                    rook_from_position,
+                );
+                self.piece_bitboards[rook_bitboard_index] =
+                    pop_bit(self.piece_bitboards[rook_bitboard_index], rook_to_position);
 
-                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[rook_bitboard_index][rook_from_position];
-                self.zobrist_hash ^= self.bitboard_constants.zobrist_table[rook_bitboard_index][rook_to_position];
+                self.zobrist_hash ^=
+                    self.bitboard_constants.zobrist_table[rook_bitboard_index][rook_from_position];
+                self.zobrist_hash ^=
+                    self.bitboard_constants.zobrist_table[rook_bitboard_index][rook_to_position];
 
                 // Update our occupancies.
-                self.occupancy_bitboards[our_occupancies_index] = set_bit(self.occupancy_bitboards[our_occupancies_index], rook_from_position);
-                self.occupancy_bitboards[our_occupancies_index] = pop_bit(self.occupancy_bitboards[our_occupancies_index], rook_to_position);
+                self.occupancy_bitboards[our_occupancies_index] = set_bit(
+                    self.occupancy_bitboards[our_occupancies_index],
+                    rook_from_position,
+                );
+                self.occupancy_bitboards[our_occupancies_index] = pop_bit(
+                    self.occupancy_bitboards[our_occupancies_index],
+                    rook_to_position,
+                );
 
                 // Update global occupancies.
-                self.occupancy_bitboards[2] = set_bit(self.occupancy_bitboards[2], rook_from_position);
-                self.occupancy_bitboards[2] = pop_bit(self.occupancy_bitboards[2], rook_to_position);
+                self.occupancy_bitboards[2] =
+                    set_bit(self.occupancy_bitboards[2], rook_from_position);
+                self.occupancy_bitboards[2] =
+                    pop_bit(self.occupancy_bitboards[2], rook_to_position);
             }
         }
 
@@ -924,13 +1138,13 @@ impl<'a> ChessGame<'a> {
         match this_move.next_en_passant_target_coord {
             Some(square) => {
                 self.zobrist_hash ^= self.bitboard_constants.zobrist_en_passant[square % 8];
-            },
+            }
             None => (),
         }
         match this_move.last_en_passant_target_coord {
             Some(square) => {
                 self.zobrist_hash ^= self.bitboard_constants.zobrist_en_passant[square % 8];
-            },
+            }
             None => (),
         }
 
@@ -941,8 +1155,6 @@ impl<'a> ChessGame<'a> {
         // Debugging!
         //self.debug_verify_board_state(this_move, debug_initial_game_state, "Unmake move");
     }
-
-
 
     pub fn sort_moves(&self, moves: &mut Vec<Move>) {
         moves.sort_unstable_by_key(|m| {
@@ -970,10 +1182,10 @@ impl<'a> ChessGame<'a> {
             }
 
             /*
-                The below checks actually slow down minimax a bit...
-                but perhaps time will be saved again by looking down the right trees?
-                Just theory crafting for now.
-             */
+               The below checks actually slow down minimax a bit...
+               but perhaps time will be saved again by looking down the right trees?
+               Just theory crafting for now.
+            */
 
             // If moving to a square we are attacking, that is good. (destination is defended)
             if self.is_square_attacked(m.to_square, &our_color) {
@@ -990,21 +1202,19 @@ impl<'a> ChessGame<'a> {
                 move_evaluation -= 2;
             }
 
-
             return move_evaluation;
         });
     }
 
-
     pub fn is_king_attacked(&self, side_attacked: &Color) -> bool {
         let king_bitboard_index = 5 + side_attacked.piece_bitboard_offset();
-        let king_square = get_lsb_index(self.piece_bitboards[king_bitboard_index]).expect("King must be on board.");
+        let king_square = get_lsb_index(self.piece_bitboards[king_bitboard_index])
+            .expect("King must be on board.");
         return match side_attacked {
             Color::White => self.is_square_attacked(king_square, &Color::Black),
             Color::Black => self.is_square_attacked(king_square, &Color::White),
         };
     }
-
 
     pub fn is_checkmate(&self) -> bool {
         // If you have a legal move, you are not in checkmate.
@@ -1038,14 +1248,12 @@ impl<'a> ChessGame<'a> {
         return !self.is_king_attacked(&our_color);
     }
 
-
     pub fn evaluate_board(&self) -> i64 {
         // Variables shared by both functions.
         let mut square: usize;
         let mut occupancies: u64;
         let mut white_piece_value_total: i64 = 0;
         let mut black_piece_value_total: i64 = 0;
-
 
         // Add up white pieces.
         occupancies = self.occupancy_bitboards[Color::White.occupancy_bitboard_index()];
@@ -1079,7 +1287,6 @@ impl<'a> ChessGame<'a> {
             occupancies = pop_bit(occupancies, square)
         }
 
-
         // Add up the pieces, return the sum?
         return white_piece_value_total - black_piece_value_total;
     }
@@ -1101,7 +1308,7 @@ impl<'a> ChessGame<'a> {
         self.legal_moves.clear();
         self.legal_moves = match moves {
             Some(m) => m,
-            None => self.get_legal_moves()
+            None => self.get_legal_moves(),
         };
     }
 
@@ -1119,16 +1326,14 @@ impl<'a> ChessGame<'a> {
             their_side = &Color::White;
         }
 
-
         // Try the move, drop it if it's illegal.
         for this_move in possible_moves.iter_mut() {
-
             // How does this move impact castling rights?
             this_move.removes_white_castling_rights_short = Some(false);
             this_move.removes_white_castling_rights_long = Some(false);
             this_move.removes_black_castling_rights_short = Some(false);
             this_move.removes_black_castling_rights_long = Some(false);
-            
+
             // Revoke our castling rights based on our move.
             match our_side {
                 Color::White => {
@@ -1137,9 +1342,10 @@ impl<'a> ChessGame<'a> {
                         if this_move.from_piece_type == Some(PieceType::King) {
                             this_move.removes_white_castling_rights_short = Some(true);
                         }
-
                         // If we are moving our rook from it's starting square, remove this right.
-                        else if this_move.from_piece_type == Some(PieceType::Rook) && this_move.from_square == 63 {
+                        else if this_move.from_piece_type == Some(PieceType::Rook)
+                            && this_move.from_square == 63
+                        {
                             this_move.removes_white_castling_rights_short = Some(true);
                         }
                     }
@@ -1149,22 +1355,24 @@ impl<'a> ChessGame<'a> {
                         if this_move.from_piece_type == Some(PieceType::King) {
                             this_move.removes_white_castling_rights_long = Some(true);
                         }
-
                         // If we are moving our rook from it's starting square, remove this right.
-                        else if this_move.from_piece_type == Some(PieceType::Rook) && this_move.from_square == 56 {
+                        else if this_move.from_piece_type == Some(PieceType::Rook)
+                            && this_move.from_square == 56
+                        {
                             this_move.removes_white_castling_rights_long = Some(true);
                         }
                     }
-                },
+                }
                 Color::Black => {
                     if self.can_black_castle_short {
                         // If we are moving the king, remove this right.
                         if this_move.from_piece_type == Some(PieceType::King) {
                             this_move.removes_black_castling_rights_short = Some(true);
                         }
-
                         // If we are moving our rook from it's starting square, remove this right.
-                        else if this_move.from_piece_type == Some(PieceType::Rook) && this_move.from_square == 7 {
+                        else if this_move.from_piece_type == Some(PieceType::Rook)
+                            && this_move.from_square == 7
+                        {
                             this_move.removes_black_castling_rights_short = Some(true);
                         }
                     }
@@ -1174,9 +1382,10 @@ impl<'a> ChessGame<'a> {
                         if this_move.from_piece_type == Some(PieceType::King) {
                             this_move.removes_black_castling_rights_long = Some(true);
                         }
-
                         // If we are moving our rook from it's starting square, remove this right.
-                        else if this_move.from_piece_type == Some(PieceType::Rook) && this_move.from_square == 0 {
+                        else if this_move.from_piece_type == Some(PieceType::Rook)
+                            && this_move.from_square == 0
+                        {
                             this_move.removes_black_castling_rights_long = Some(true);
                         }
                     }
@@ -1191,7 +1400,6 @@ impl<'a> ChessGame<'a> {
                         if self.can_black_castle_short && this_move.to_square == 7 {
                             this_move.removes_black_castling_rights_short = Some(true);
                         }
-
                         // If black can castle long, but we are capturing the rook on it's starting square; revoke.
                         else if self.can_black_castle_long && this_move.to_square == 0 {
                             this_move.removes_black_castling_rights_long = Some(true);
@@ -1202,7 +1410,6 @@ impl<'a> ChessGame<'a> {
                         if self.can_white_castle_short && this_move.to_square == 63 {
                             this_move.removes_white_castling_rights_short = Some(true);
                         }
-
                         // If white can castle long, but we are capturing the rook on it's starting square; revoke.
                         else if self.can_white_castle_long && this_move.to_square == 56 {
                             this_move.removes_white_castling_rights_long = Some(true);
@@ -1215,7 +1422,6 @@ impl<'a> ChessGame<'a> {
 
             // Does the move put us in check?
             if !self.is_king_attacked(our_side) {
-
                 // Does it put them in check?
                 this_move.is_check = Some(self.is_king_attacked(their_side));
                 moves.push(*this_move);
@@ -1224,7 +1430,6 @@ impl<'a> ChessGame<'a> {
             self.unmake_move(this_move);
         }
 
-
         self.sort_moves(&mut moves);
 
         return moves;
@@ -1232,7 +1437,7 @@ impl<'a> ChessGame<'a> {
 
     // Will generate moves that put self in check.
     pub fn get_psuedo_legal_moves(&self) -> Vec<Move> {
-        let mut moves: Vec<Move> =  vec![];
+        let mut moves: Vec<Move> = vec![];
 
         // Get all the moves.
         moves.append(&mut self.get_moves_slider(PieceType::Queen));
@@ -1291,7 +1496,6 @@ impl<'a> ChessGame<'a> {
                 panic!("Attempted to get slider piece moves for non-slider piece.");
             }
         };
-
 
         while slider_pieces != 0 {
             source_square = get_lsb_index(slider_pieces).expect("This should not happen.");
@@ -1377,17 +1581,20 @@ impl<'a> ChessGame<'a> {
 
         if self.white_to_move {
             their_occupancies = self.occupancy_bitboards[Color::Black.occupancy_bitboard_index()];
-            knights = self.piece_bitboards[Color::White.piece_bitboard_offset() + PieceType::Knight.bitboard_index()];
+            knights = self.piece_bitboards
+                [Color::White.piece_bitboard_offset() + PieceType::Knight.bitboard_index()];
         } else {
             their_occupancies = self.occupancy_bitboards[Color::White.occupancy_bitboard_index()];
-            knights = self.piece_bitboards[Color::Black.piece_bitboard_offset() + PieceType::Knight.bitboard_index()];
+            knights = self.piece_bitboards
+                [Color::Black.piece_bitboard_offset() + PieceType::Knight.bitboard_index()];
         }
 
         while knights != 0 {
             source_square = get_lsb_index(knights).expect("This should not happen.");
 
             // Get moves and captures seperately.
-            quiet_moves = self.bitboard_constants.knight_attacks[source_square] & (!self.occupancy_bitboards[2]);
+            quiet_moves = self.bitboard_constants.knight_attacks[source_square]
+                & (!self.occupancy_bitboards[2]);
             captures = self.bitboard_constants.knight_attacks[source_square] & their_occupancies;
 
             while quiet_moves != 0 {
@@ -1455,14 +1662,16 @@ impl<'a> ChessGame<'a> {
         if self.white_to_move {
             their_color = &Color::Black;
             their_occupancies = self.occupancy_bitboards[Color::Black.occupancy_bitboard_index()];
-            bitboard = self.piece_bitboards[Color::White.piece_bitboard_offset() + PieceType::King.bitboard_index()];
+            bitboard = self.piece_bitboards
+                [Color::White.piece_bitboard_offset() + PieceType::King.bitboard_index()];
             can_castle_short = self.can_white_castle_short;
             can_castle_long = self.can_white_castle_long;
             king_starting_square = 60;
         } else {
             their_color = &Color::White;
             their_occupancies = self.occupancy_bitboards[Color::White.occupancy_bitboard_index()];
-            bitboard = self.piece_bitboards[Color::Black.piece_bitboard_offset() + PieceType::King.bitboard_index()];
+            bitboard = self.piece_bitboards
+                [Color::Black.piece_bitboard_offset() + PieceType::King.bitboard_index()];
             can_castle_short = self.can_black_castle_short;
             can_castle_long = self.can_black_castle_long;
             king_starting_square = 4;
@@ -1473,9 +1682,9 @@ impl<'a> ChessGame<'a> {
         }
 
         source_square = get_lsb_index(bitboard).expect("Guard before should handle this.");
-        let mut quiet_moves = self.bitboard_constants.king_attacks[source_square] & (!self.occupancy_bitboards[2]);
+        let mut quiet_moves =
+            self.bitboard_constants.king_attacks[source_square] & (!self.occupancy_bitboards[2]);
         let mut attacks = self.bitboard_constants.king_attacks[source_square] & their_occupancies;
-
 
         // Moves
         while quiet_moves != 0 {
@@ -1526,16 +1735,19 @@ impl<'a> ChessGame<'a> {
 
         // Castling
         if can_castle_short {
-
             // 1. Make sure squares are empty.
-            let squares_should_be_empty = set_bit(0, king_starting_square + 1) | set_bit(0, king_starting_square + 2);
+            let squares_should_be_empty =
+                set_bit(0, king_starting_square + 1) | set_bit(0, king_starting_square + 2);
 
             // 2. Make sure intermediary square is not attacked. Our final check for pins will handle checking the destination square.
-            let is_intermediary_square_attacked = self.is_square_attacked(king_starting_square + 1, their_color);
+            let is_intermediary_square_attacked =
+                self.is_square_attacked(king_starting_square + 1, their_color);
 
             // If both conditions are met, we can castle.
             target_square = king_starting_square + 2;
-            if (squares_should_be_empty & self.occupancy_bitboards[2]) == 0 && !is_intermediary_square_attacked {
+            if (squares_should_be_empty & self.occupancy_bitboards[2]) == 0
+                && !is_intermediary_square_attacked
+            {
                 moves.push(Move {
                     from_square: source_square,
                     from_piece_type: Some(PieceType::King),
@@ -1556,16 +1768,20 @@ impl<'a> ChessGame<'a> {
         }
 
         if can_castle_long {
-
             // 1. Make sure squares are empty.
-            let squares_should_be_empty = set_bit(0, king_starting_square - 1) | set_bit(0, king_starting_square - 2) | set_bit(0, king_starting_square - 3);
+            let squares_should_be_empty = set_bit(0, king_starting_square - 1)
+                | set_bit(0, king_starting_square - 2)
+                | set_bit(0, king_starting_square - 3);
 
             // 2. Make sure intermediary square is not attacked. Our final check for pins will handle checking the destination square.
-            let is_intermediary_square_attacked = self.is_square_attacked(king_starting_square - 1, their_color);
+            let is_intermediary_square_attacked =
+                self.is_square_attacked(king_starting_square - 1, their_color);
 
             // If both conditions are met, we can castle.
             target_square = king_starting_square - 2;
-            if (squares_should_be_empty & self.occupancy_bitboards[2]) == 0 && !is_intermediary_square_attacked {
+            if (squares_should_be_empty & self.occupancy_bitboards[2]) == 0
+                && !is_intermediary_square_attacked
+            {
                 moves.push(Move {
                     from_square: source_square,
                     from_piece_type: Some(PieceType::King),
@@ -1608,7 +1824,8 @@ impl<'a> ChessGame<'a> {
         if self.white_to_move {
             our_color = Color::White;
             their_occupancies = self.occupancy_bitboards[Color::Black.occupancy_bitboard_index()];
-            bitboard = self.piece_bitboards[Color::White.piece_bitboard_offset() + PieceType::Pawn.bitboard_index()];
+            bitboard = self.piece_bitboards
+                [Color::White.piece_bitboard_offset() + PieceType::Pawn.bitboard_index()];
             pawn_move_offset = -8;
             promotion_rank_lower = 0;
             promotion_rank_upper = 7;
@@ -1617,7 +1834,8 @@ impl<'a> ChessGame<'a> {
         } else {
             our_color = Color::Black;
             their_occupancies = self.occupancy_bitboards[Color::White.occupancy_bitboard_index()];
-            bitboard = self.piece_bitboards[Color::Black.piece_bitboard_offset() + PieceType::Pawn.bitboard_index()];
+            bitboard = self.piece_bitboards
+                [Color::Black.piece_bitboard_offset() + PieceType::Pawn.bitboard_index()];
             pawn_move_offset = 8;
             promotion_rank_lower = 56;
             promotion_rank_upper = 63;
@@ -1632,7 +1850,6 @@ impl<'a> ChessGame<'a> {
             target_square = (source_square as i32 + pawn_move_offset) as usize;
             let mut is_occupied = get_bit(all_occupancies, target_square) != 0;
             if !is_occupied {
-
                 // Check for promotions (no capture).
                 if target_square >= promotion_rank_lower && target_square <= promotion_rank_upper {
                     moves.push(Move {
@@ -1718,11 +1935,15 @@ impl<'a> ChessGame<'a> {
                     });
 
                     // Check for the double move.
-                    target_square = (source_square as i32 + pawn_move_offset + pawn_move_offset) as usize;
+                    target_square =
+                        (source_square as i32 + pawn_move_offset + pawn_move_offset) as usize;
                     is_occupied = get_bit(all_occupancies, target_square) != 0;
 
                     // If pawn is on the 2nd rank, it can move two tiles.
-                    if source_square >= our_starting_rank_lower && source_square <= our_starting_rank_upper && !is_occupied {
+                    if source_square >= our_starting_rank_lower
+                        && source_square <= our_starting_rank_upper
+                        && !is_occupied
+                    {
                         moves.push(Move {
                             from_square: source_square,
                             from_piece_type: Some(PieceType::Pawn),
@@ -1730,7 +1951,9 @@ impl<'a> ChessGame<'a> {
                             to_piece_type: None,
                             is_check: None,
                             last_en_passant_target_coord: self.en_passant_target,
-                            next_en_passant_target_coord: Some((source_square as i32 + pawn_move_offset) as usize),
+                            next_en_passant_target_coord: Some(
+                                (source_square as i32 + pawn_move_offset) as usize,
+                            ),
                             is_en_passant_capture: false,
                             pawn_promoting_to: None,
                             castle_side: None,
@@ -1744,7 +1967,8 @@ impl<'a> ChessGame<'a> {
             }
 
             // Handles captures (non-en-passant).
-            attacks = self.bitboard_constants.pawn_attacks[our_color.idx()][source_square] & their_occupancies;
+            attacks = self.bitboard_constants.pawn_attacks[our_color.idx()][source_square]
+                & their_occupancies;
             while attacks != 0 {
                 target_square = get_lsb_index(attacks).expect("Should not be empty.");
                 (to_piece_type, _) = self.get_piece_at_square(target_square);
@@ -1837,7 +2061,8 @@ impl<'a> ChessGame<'a> {
             // Handles captures (en-passant)
             match self.en_passant_target {
                 Some(s) => {
-                    attacks = self.bitboard_constants.pawn_attacks[our_color.idx()][source_square] & set_bit(0, s);
+                    attacks = self.bitboard_constants.pawn_attacks[our_color.idx()][source_square]
+                        & set_bit(0, s);
 
                     if attacks != 0 {
                         target_square = get_lsb_index(attacks).expect("This should not be empty.");
@@ -1859,9 +2084,8 @@ impl<'a> ChessGame<'a> {
                         });
                     }
                 }
-                _ => ()
+                _ => (),
             }
-
 
             // Empty the board! and go next.
             bitboard = pop_bit(bitboard, source_square);
@@ -1869,8 +2093,6 @@ impl<'a> ChessGame<'a> {
 
         return moves;
     }
-
-
 
     pub fn play_game_vs_bot(&mut self) {
         //self.import_fen(INITIAL_GAME_STATE_FEN);
@@ -1972,7 +2194,6 @@ impl<'a> ChessGame<'a> {
         //let (evaluation, best_move) = self.minimax(4, std::i64::MIN, std::i64::MAX);
         let (evaluation, best_move) = self.iterative_deepening_minimax();
 
-
         return best_move.unwrap();
     }
 
@@ -1985,7 +2206,6 @@ impl<'a> ChessGame<'a> {
 
         println!("Best move evaluation {evaluation}");
 
-
         return best_move.unwrap();
     }
 
@@ -1997,15 +2217,16 @@ impl<'a> ChessGame<'a> {
 
         // Iteratively deepen...
         loop {
-
             //println!("Currently searching depth {search_depth}");
-
 
             // Search at the current depth.
             (best_evaluation, best_move) = self.minimax(search_depth, std::i64::MIN, std::i64::MAX);
 
             // See how long that last operation took. If it was too long, stop the search.
-            let time_spent_ms = std::time::SystemTime::now().duration_since(start_time).expect("Time went back?").as_millis();
+            let time_spent_ms = std::time::SystemTime::now()
+                .duration_since(start_time)
+                .expect("Time went back?")
+                .as_millis();
             if time_spent_ms >= 5_000 {
                 break;
             }
@@ -2022,15 +2243,16 @@ impl<'a> ChessGame<'a> {
         return (best_evaluation, best_move);
     }
 
-
-
     pub fn minimax(&mut self, depth: u32, mut alpha: i64, mut beta: i64) -> (i64, Option<Move>) {
         self.debug_minimax_calls += 1;
 
         let zobrist_hash_index = self.zobrist_hash % 10_000;
 
         if self.transposition_table.contains_key(&zobrist_hash_index) {
-            let entry = self.transposition_table.get(&zobrist_hash_index).expect("Guard clause filters this.");
+            let entry = self
+                .transposition_table
+                .get(&zobrist_hash_index)
+                .expect("Guard clause filters this.");
             if entry.depth >= depth && self.zobrist_hash == entry.zobrist_hash {
                 //println!("{}Cache hit at good depth!", debug_depth_to_tabs(depth));
                 match entry.node_type {
@@ -2106,7 +2328,6 @@ impl<'a> ChessGame<'a> {
         } else {
             best_evaluation = std::i64::MAX;
             for legal_move in temp_legal_move_clone.iter() {
-
                 // Make the move.
                 self.make_move(legal_move, true);
 
@@ -2134,7 +2355,6 @@ impl<'a> ChessGame<'a> {
         // Restore legal moves before exiting.
         self.set_legal_moves(Some(temp_legal_move_clone));
 
-
         // Find out transposition table node type.
         let node: TranspositionTableNodeType;
         if best_evaluation <= alpha {
@@ -2147,22 +2367,31 @@ impl<'a> ChessGame<'a> {
 
         // Update transposition table.
         let time = std::time::SystemTime::now();
-        self.transposition_table.insert(zobrist_hash_index, TranspositionTableEntry {
-            zobrist_hash: self.zobrist_hash,
-            best_move: best_move,
-            depth: depth,
-            node_type: node,
-            evaluation: best_evaluation,
-            age: time.duration_since(std::time::UNIX_EPOCH).expect("Time went back?").as_millis(),
-        });
+        self.transposition_table.insert(
+            zobrist_hash_index,
+            TranspositionTableEntry {
+                zobrist_hash: self.zobrist_hash,
+                best_move: best_move,
+                depth: depth,
+                node_type: node,
+                evaluation: best_evaluation,
+                age: time
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("Time went back?")
+                    .as_millis(),
+            },
+        );
         //println!("{}Set data in transposition table. Minimax call: {}", debug_depth_to_tabs(depth), self.debug_minimax_calls);
 
         return (best_evaluation, best_move);
     }
 
-
-    
-    pub fn minimax_debug(&mut self, depth: u32, mut alpha: i64, mut beta: i64) -> (i64, Option<Move>) {
+    pub fn minimax_debug(
+        &mut self,
+        depth: u32,
+        mut alpha: i64,
+        mut beta: i64,
+    ) -> (i64, Option<Move>) {
         // Debugging!
         self.debug_minimax_calls += 1;
 
@@ -2221,8 +2450,6 @@ impl<'a> ChessGame<'a> {
                     break;
                 }
 
-                
-
                 // Undo the move, track alpha.
                 self.unmake_move(legal_move);
 
@@ -2234,8 +2461,6 @@ impl<'a> ChessGame<'a> {
         } else {
             best_evaluation = std::i64::MAX;
             for legal_move in temp_legal_move_clone.iter() {
-
-
                 // Make the move.
                 self.make_move(legal_move, true);
 
@@ -2277,12 +2502,14 @@ impl<'a> ChessGame<'a> {
         return (best_evaluation, best_move);
     }
 
-
     pub fn print_debug_game_state_str(&self) {
         self.print_board();
         println!("White to move?: {}", self.white_to_move);
         println!("Zobrist Hash: {}", self.zobrist_hash);
-        println!("Transposition Table Size: {}", self.transposition_table.len());
+        println!(
+            "Transposition Table Size: {}",
+            self.transposition_table.len()
+        );
 
         print!("En-Passant Target Square: ");
         match self.en_passant_target {
@@ -2302,4 +2529,3 @@ impl<'a> ChessGame<'a> {
         println!("FEN: {}", self.export_fen());
     }
 }
-
