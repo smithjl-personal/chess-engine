@@ -337,31 +337,97 @@ impl<'a> ChessGame<'a> {
             None => return Ok(()),
         };
 
-        // Half-Moves since last pawn move and capture (for 50 move rule).
-        // let half_move_str = parts.next();
-        // match half_move_str {
-        //     Some(s) => {
-        //         let parsed_number: Result<u32, _> = s.parse();
-        //         if parsed_number.is_ok() {
-        //             self.half_move_count_non_pawn_non_capture = parsed_number.unwrap();
-        //         }
-        //     }
-        //     None => return,
-        // }
-
-        // Full move count. Incremented after black moves.
-        // let full_move_count_str = parts.next();
-        // match full_move_count_str {
-        //     Some(s) => {
-        //         let parsed_number: Result<u32, _> = s.parse();
-        //         if parsed_number.is_ok() {
-        //             self.full_move_count = parsed_number.unwrap();
-        //         }
-        //     }
-        //     None => return,
-        // }
-
         return Ok(());
+    }
+
+
+    pub fn export_fen(&self) -> String {
+        let mut fen = String::new();
+        let mut prior_empty_count = 0;
+        let mut file;
+        for square in 0..64 {
+
+            // Track our file.
+            file = square % 8;
+
+            // Get the piece at this square.
+            let (piece_option, color_option) = self.get_piece_at_square(square);
+
+            match piece_option {
+                Some(piece) => {
+
+                    // If we had spaces before, print that and reset.
+                    if prior_empty_count > 0 {
+                        fen += &prior_empty_count.to_string();
+                        prior_empty_count = 0;
+                    }
+
+                    let color = color_option.expect("Piece returned without a color?");
+                    fen += &piece.to_char(color).to_string();
+                }
+                None => {
+                    prior_empty_count += 1;
+                }
+            }
+
+            // If we are on the last file
+            if file == 7 {
+
+                // If we have any empties, output the number.
+                if prior_empty_count > 0 {
+                    fen += &prior_empty_count.to_string();
+                }
+
+                // Clear the empty count.
+                prior_empty_count = 0;
+
+                // Add the slash, if not on the last row.
+                if square != 63 {
+                    fen += "/";
+                }
+            }
+        }
+
+        // Add the game status (turn to move)
+        if self.white_to_move {
+            fen += " w ";
+        } else {
+            fen += " b ";
+        }
+
+        // Castling rights.
+        if self.can_white_castle_short {
+            fen += "K";
+        }
+        if self.can_white_castle_long {
+            fen += "Q";
+        }
+        if self.can_black_castle_short {
+            fen += "k";
+        }
+        if self.can_black_castle_long {
+            fen += "q";
+        }
+
+        // Special case if no casting rights available.
+        if
+            !self.can_white_castle_short
+            &&!self.can_white_castle_long
+            &&!self.can_black_castle_short
+            &&!self.can_black_castle_long {
+            fen += "-";
+        }
+
+        // En-Passant Square.
+        fen += " ";
+        match self.en_passant_target {
+            Some(square) => fen += &square_to_coord(square),
+            None => fen += "-"
+        }
+
+        // Ehhh, at some point add the half moves since last capture or pawn advance. And the full move count.
+
+        return fen;
     }
 
     pub fn place_piece_on_board(&mut self, side: Color, piece_type: PieceType, square: usize) {
@@ -2230,8 +2296,10 @@ impl<'a> ChessGame<'a> {
         println!("\tBlack Castle Short? {}", self.can_black_castle_short);
         println!("\tBlack Castle Long? {}", self.can_black_castle_long);
 
-        println!("Legal moves:");
+        print!("Legal moves: ");
         self.print_legal_moves();
+
+        println!("FEN: {}", self.export_fen());
     }
 }
 
