@@ -1,4 +1,4 @@
-use crate::{constants, lichess_structs, bitboard, runtime_calculated_constants};
+use crate::{constants, lichess_structs, chess_game, runtime_calculated_constants};
 use core::str;
 use std::collections::HashMap;
 use std::env;
@@ -39,7 +39,7 @@ async fn play_game(token: &str, game_id: &str, fen: &str) {
     // This function will run forever, when calling a streamed API.
     let mut lichess_game: lichess_structs::GameFull = lichess_structs::GameFull::default();
     let runtime_constant = runtime_calculated_constants::Constants::new();
-    let mut game = bitboard::ChessGame::new(&runtime_constant);
+    let mut game = chess_game::ChessGame::new(&runtime_constant);
     let mut is_bot_white: bool = true;
     while let Some(chunk) = response.chunk().await.unwrap() {
         // We just received the '\n' from the API to keep the connection alive. Ignore processing.
