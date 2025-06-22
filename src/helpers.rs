@@ -107,6 +107,7 @@ pub fn str_coord_to_square(s: &str) -> Result<usize, String> {
         return Err(format!("Invalid file letter: {}", file_str));
     }
 
+    // TODO: Ensure rank is between 1-8 inclusive.
     let rank: usize = match rank_str.to_digit(10) {
         Some(n) => (8 - n).try_into().unwrap(),
         None => return Err(format!("Unable to convert `{}` to a digit.", rank_str)),

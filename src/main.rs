@@ -1,14 +1,4 @@
-pub mod castle_sides;
-pub mod chess_game;
-pub mod color;
-pub mod constants;
-pub mod helpers;
-pub mod lichess;
-pub mod lichess_structs;
-pub mod r#move;
-pub mod piece_type;
-pub mod runtime_calculated_constants;
-pub mod transposition_table_entry;
+use chess_engine::lichess;
 
 #[tokio::main]
 async fn main() {
