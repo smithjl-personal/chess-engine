@@ -102,16 +102,21 @@ pub fn str_coord_to_square(s: &str) -> Result<usize, String> {
     let rank_str = s.chars().nth(1).unwrap();
 
     // Attempt conversion for file letter.
-    let file: usize = file_str as usize - 'a' as usize;
-    if file >= 8 as usize {
-        return Err(format!("Invalid file letter: {}", file_str));
+    let (file, overflowed) = (file_str as usize).overflowing_sub('a' as usize);
+    if file >= 8 || overflowed {
+        return Err(format!("Invalid file letter: `{}`, should be between `a` and `h`.", file_str));
     }
 
-    // TODO: Ensure rank is between 1-8 inclusive.
     let rank: usize = match rank_str.to_digit(10) {
-        Some(n) => (8 - n).try_into().unwrap(),
+        Some(n) => n.try_into().unwrap(),
         None => return Err(format!("Unable to convert `{}` to a digit.", rank_str)),
     };
 
-    return Ok(rank * 8 + file);
+    if rank < 1 || rank > 8 {
+        return Err("Invalid rank, it should be a value between 1 and 8 inclusive.".to_string());
+    }
+
+    let rank_normalized = 8 - rank;
+
+    return Ok(rank_normalized * 8 + file);
 }

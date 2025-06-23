@@ -1,6 +1,5 @@
 use chess_engine::r#move::Move;
 
-
 #[test]
 fn test_str_to_move() {
     let mut move_str: &str;
@@ -25,9 +24,8 @@ fn test_str_to_move() {
     assert!(unwrapped_move.to_square == 4);
     assert!(unwrapped_move.pawn_promoting_to.is_some());
 
-    // Should fail. Fix TODO.
-    // move_str = "a0a0";
-    // parsed_move = Move::str_to_move(move_str);
-    // print!("{parsed_move:#?}");
-    // assert!(parsed_move.is_err(), "Parsed invalid move {move_str} when it should have failed.");
+    // Should fail.
+    move_str = "a0a0";
+    parsed_move = Move::str_to_move(move_str);
+    assert!(parsed_move.is_err(), "Parsed invalid move {move_str} when it should have failed.");
 }
